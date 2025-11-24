@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export default function Footer() {
   return (
     <footer className="site-footer">
@@ -21,6 +23,11 @@ export default function Footer() {
               <a href="https://w9.se" target="_blank" rel="noreferrer">
                 W9 Tools
               </a>
+            </li>
+            <li>
+              <Link href="/privacy">
+                Privacy Policy
+              </Link>
             </li>
           </ul>
         </div>

@@ -2,15 +2,15 @@ import SystemStatus from './SystemStatus'
 
 export default function SystemShell() {
   return (
-    <div className="box">
-      <h2 className="section-title">System · Deployment Checklist</h2>
+    <>
+      <div className="box">
+        <h2 className="section-title">System · Deployment Checklist</h2>
       <p>Axum orchestrator exposes strict JSON endpoints consumed by this frontend.</p>
       <ul className="list">
         <li>Configure env vars via install.sh (CEREBRAS_API_KEY, GOOGLE_CLIENT_ID/SECRET).</li>
         <li>Backend listens on :8787; Next proxy uses NEXT_PUBLIC_API_BASE.</li>
         <li>install.sh builds frontend with `npm run build` and deploys static output via PM2/Next.</li>
       </ul>
-      <SystemStatus />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -43,6 +43,10 @@ export default function SystemShell() {
           </tbody>
         </table>
       </div>
-    </div>
+      <div className="box">
+        <h2 className="section-title">Orchestrator health</h2>
+        <SystemStatus />
+      </div>
+    </>
   )
 }

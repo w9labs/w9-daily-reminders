@@ -4,10 +4,6 @@ import SystemStatus from './components/SystemStatus'
 export default function Page() {
   return (
     <>
-      <header className="header">
-        <h1>W9 Daily Reminders · Console Briefings</h1>
-        <p>Google Calendar sync + Cerebras zai-glm-4.6 reasoning + Pollinations art directive.</p>
-      </header>
       <div className="box">
         <h2 className="section-title">Mission</h2>
         <p>

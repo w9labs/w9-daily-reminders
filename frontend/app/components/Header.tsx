@@ -1,19 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { useSession } from '../../lib/session'
 import { clearToken } from '../../lib/auth'
 
-const links = [
-  { href: '/', label: 'Console' },
-  { href: '/preview', label: 'Preview' },
-  { href: '/system', label: 'System' },
-  { href: '/admin', label: 'Admin' },
-]
-
 export default function Header() {
-  const pathname = usePathname()
   const { user } = useSession()
 
   return (
@@ -29,16 +20,18 @@ export default function Header() {
               <p>
                 Signed in as <span className="mono">{user.email}</span> · {user.role.toUpperCase()}
               </p>
-              <button
-                type="button"
-                className="button ghost"
-                onClick={() => {
-                  clearToken()
-                  window.location.href = '/login'
-                }}
-              >
-                Sign out
-              </button>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="button ghost"
+                  onClick={() => {
+                    clearToken()
+                    window.location.href = '/login'
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
             </>
           ) : (
             <div className="actions">
@@ -52,19 +45,6 @@ export default function Header() {
           )}
         </div>
       </div>
-      <nav className="nav">
-        {links.map((link) => (
-          <Link key={link.href} href={link.href} className={`nav-link ${pathname === link.href ? 'active' : ''}`}>
-            {link.label}
-          </Link>
-        ))}
-        <Link href="/login" className={`nav-link ${pathname === '/login' ? 'active' : ''}`}>
-          Login
-        </Link>
-        <Link href="/register" className={`nav-link ${pathname === '/register' ? 'active' : ''}`}>
-          Register
-        </Link>
-      </nav>
     </header>
   )
 }

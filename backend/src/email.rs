@@ -42,16 +42,78 @@ pub fn build_preview(
   })
 }
 
+fn html_escape(input: &str) -> String {
+  input
+    .replace('&', "&amp;")
+    .replace('<', "&lt;")
+    .replace('>', "&gt;")
+    .replace('"', "&quot;")
+    .replace('\'', "&#x27;")
+}
+
 fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> String {
   let weather_block = weather
-    .map(|w| format!("<p style=\"border:2px dashed #fff;padding:12px;margin:0 0 16px 0;font-size:14px\">{w}</p>"))
+    .map(|w| {
+      let escaped = html_escape(w);
+      format!(
+        "<div style=\"border:2px dashed #fff;padding:12px;margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#fff;\">{}</div>",
+        escaped
+      )
+    })
     .unwrap_or_default();
+  
   let image_block = image_url
-    .map(|url| format!("<p style=\"margin:0 0 16px 0;font-size:14px\">Visual cue: <a href=\"{url}\">{url}</a></p>"))
+    .map(|url| {
+      format!(
+        "<div style=\"margin:0 0 24px 0;text-align:center;\"><img src=\"{}\" alt=\"Daily visual\" style=\"max-width:100%;height:auto;border:2px solid #fff;display:block;margin:0 auto;\" /></div>",
+        html_escape(url)
+      )
+    })
     .unwrap_or_default();
 
+  let escaped_inner = html_escape(inner);
+  let html_body = escaped_inner.replace("\n", "<br />");
+
   format!(
-    "<!doctype html><html><body style=\"background:#000;color:#fff;font-family:'Courier New',Courier,monospace;padding:32px\"><table width=\"100%\" cellpadding=0 cellspacing=0 style=\"max-width:640px;margin:0 auto;border:2px solid #fff\"><tr><td style=\"padding:24px\"><h1 style=\"text-transform:uppercase;font-size:20px;margin-bottom:16px\">W9 Daily Reminder</h1>{weather_block}{image_block}<div style=\"font-size:15px;line-height:1.5\">{inner}</div><p style=\"margin-top:24px;font-size:13px;text-transform:uppercase\">Console generated · zai-glm-4.6</p></td></tr></table></body></html>"
+    r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>W9 Daily Reminder</title>
+</head>
+<body style="background:#050505;padding:32px;font-family:'Courier New',Courier,monospace;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;border:2px solid #fdfdfd;padding:28px;background:#000;">
+          <tr><td style="text-align:left;">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <tr>
+                <td style="width:42px;height:42px;border:2px solid #fdfdfd;text-align:center;vertical-align:middle;font-weight:bold;color:#fdfdfd;line-height:42px;font-size:16px;padding:0;margin:0;">W9</td>
+                <td style="padding-left:12px;vertical-align:middle;">
+                  <div style="color:#fdfdfd;font-size:18px;letter-spacing:0.1em;text-transform:uppercase;">W9 Daily Reminders</div>
+                  <div style="color:#9a9a9a;font-size:12px;">AI-assisted daily briefings</div>
+                </td>
+              </tr>
+            </table>
+            {weather_block}
+            {image_block}
+            <div style="color:#fdfdfd;font-size:15px;line-height:1.6;font-family:'Courier New',Courier,monospace;margin-bottom:24px;">
+              {html_body}
+            </div>
+            <hr style="border:none;border-top:2px solid #1a1a1a;margin:32px 0;" />
+            <p style="margin:0;color:#686868;font-size:11px;line-height:1.4;text-transform:uppercase;">Console generated · zai-glm-4.6</p>
+          </td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"#,
+    weather_block = weather_block,
+    image_block = image_block,
+    html_body = html_body
   )
 }
 

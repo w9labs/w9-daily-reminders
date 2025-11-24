@@ -54,3 +54,18 @@ export function completeGoogleAuth(code: string) {
     body: JSON.stringify({ code }),
   })
 }
+
+export function sendTestEmail(recipient?: string) {
+  return request<{ status: string }>('/api/reminders/send-test', {
+    method: 'POST',
+    headers: {
+      'authorization': `Bearer ${getStoredToken() || ''}`,
+    },
+    body: JSON.stringify({ recipient }),
+  })
+}
+
+function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('w9_token')
+}

@@ -87,7 +87,7 @@ impl CerebrasClient {
       "messages": [
         {
           "role": "system",
-          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. No explanations, no markdown, just the JSON object."
+          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The image_prompt should describe a random view with cozy feelings (e.g., a warm coffee shop, a peaceful reading nook, a serene landscape, a comfortable workspace). No explanations, no markdown, just the JSON object."
         },
         {
           "role": "user",

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import './globals.css'
 import Header from './components/Header'
+import Nav from './components/Nav'
 import Footer from './components/Footer'
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default function RootLayout({
         <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" async defer />
         <div className="page-container">
           <Header />
+          <Nav />
           <main className="app">{children}</main>
           <Footer />
         </div>

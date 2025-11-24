@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { ReminderPreview, ReminderSettings } from '../../lib/types'
-import { getSettings, requestPreview } from '../../lib/api'
+import { getSettings, requestPreview, sendTestEmail } from '../../lib/api'
+import { useSession } from '../../lib/session'
 
 export default function PreviewShell() {
   const [settings, setSettings] = useState<ReminderSettings>()
@@ -10,6 +11,8 @@ export default function PreviewShell() {
   const [status, setStatus] = useState('bootstrap')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const { user } = useSession()
 
   const hydrate = useCallback(async () => {
     setLoading(true)
@@ -31,9 +34,25 @@ export default function PreviewShell() {
     setLoading(false)
   }, [])
 
+  const handleSendTest = useCallback(async () => {
+    if (!preview) return
+    setSending(true)
+    setError('')
+    const recipient = settings?.userEmail
+    const res = await sendTestEmail(recipient)
+    if (res.ok) {
+      setStatus('test email sent')
+    } else {
+      setError(res.error || 'failed to send test email')
+    }
+    setSending(false)
+  }, [preview, settings])
+
   useEffect(() => {
     hydrate()
   }, [hydrate])
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'dev'
 
   return (
     <div className="box">
@@ -43,6 +62,11 @@ export default function PreviewShell() {
         <button type="button" onClick={hydrate} disabled={loading}>
           Refresh preview
         </button>
+        {isAdmin && (
+          <button type="button" onClick={handleSendTest} disabled={loading || sending || !preview} className="button ghost">
+            {sending ? 'Sending…' : 'Send test email'}
+          </button>
+        )}
       </div>
       {loading && <div className="status">Generating preview…</div>}
       {error && <div className="status error">{error}</div>}
