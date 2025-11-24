@@ -71,8 +71,9 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> Str
     })
     .unwrap_or_default();
 
-  let escaped_inner = html_escape(inner);
-  let html_body = escaped_inner.replace("\n", "<br />");
+  // html_body from Cerebras is already HTML, don't escape it
+  // Just use it directly
+  let html_body = inner;
 
   format!(
     r#"<!DOCTYPE html>
