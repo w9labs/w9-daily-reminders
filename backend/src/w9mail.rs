@@ -102,7 +102,7 @@ impl W9MailClient {
     if base.trim().is_empty() {
       return Err(W9MailError::MissingBase);
     }
-    let url = Self::build_url(base, "/api/send");
+    let url = Self::build_url(base, "/send");
     let resp = self
       .http
       .post(url)
@@ -111,14 +111,15 @@ impl W9MailClient {
       .send()
       .await?;
 
-    if resp.status() == StatusCode::UNAUTHORIZED {
+    let status = resp.status();
+    if status == StatusCode::UNAUTHORIZED {
       return Err(W9MailError::Unauthorized);
     }
 
     // w9-mail API returns 200 even on errors, with JSON body indicating status
     let body_text = resp.text().await.unwrap_or_default();
     
-    if !resp.status().is_success() {
+    if !status.is_success() {
       return Err(W9MailError::InvalidResponse(body_text));
     }
 
