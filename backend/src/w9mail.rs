@@ -102,7 +102,7 @@ impl W9MailClient {
     if base.trim().is_empty() {
       return Err(W9MailError::MissingBase);
     }
-    let url = Self::build_url(base, "/send");
+    let url = Self::build_url(base, "/api/send");
     let resp = self
       .http
       .post(url)
@@ -115,9 +115,23 @@ impl W9MailClient {
       return Err(W9MailError::Unauthorized);
     }
 
+    // w9-mail API returns 200 even on errors, with JSON body indicating status
+    let body_text = resp.text().await.unwrap_or_default();
+    
     if !resp.status().is_success() {
-      let body = resp.text().await.unwrap_or_default();
-      return Err(W9MailError::InvalidResponse(body));
+      return Err(W9MailError::InvalidResponse(body_text));
+    }
+
+    // Parse response to check for error status
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {
+      if let Some(status) = json.get("status").and_then(|s| s.as_str()) {
+        if status == "error" {
+          let message = json.get("message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("Unknown error from w9-mail API");
+          return Err(W9MailError::InvalidResponse(message.to_string()));
+        }
+      }
     }
 
     Ok(())
