@@ -40,13 +40,9 @@ impl GoogleClient {
   pub fn auth_url(&self, state: &str) -> String {
     let scope = urlencoding::encode("https://www.googleapis.com/auth/calendar.readonly");
     format!(
-      concat!(
-        "https://accounts.google.com/o/oauth2/v2/auth?scope={scope}",&
-        "&access_type=offline&include_granted_scopes=true&response_type=code",
-        "&prompt=consent&state={state}&redirect_uri={redirect}&client_id={client}"
-      ),
+      "https://accounts.google.com/o/oauth2/v2/auth?scope={scope}&access_type=offline&include_granted_scopes=true&response_type=code&prompt=consent&state={state}&redirect_uri={redirect}&client_id={client}",
       scope = scope,
-      state = state,
+      state = urlencoding::encode(state),
       redirect = urlencoding::encode(&self.redirect_uri),
       client = urlencoding::encode(&self.client_id),
     )

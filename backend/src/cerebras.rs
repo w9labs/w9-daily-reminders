@@ -106,7 +106,10 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
   let mut prompt = String::new();
   prompt.push_str("Generate AI reminder email copy for W9 brand. JSON only.\n");
   prompt.push_str(&format!("Language: {}\n", resolve_language(settings)));
-  prompt.push_str(&format!("Summary style: {:?}\n", settings.summary_style));
+  prompt.push_str(&format!(
+    "Summary style: {}\n",
+    summary_style_label(&settings.summary_style)
+  ));
   prompt.push_str("Events (ISO8601 in timezone, include location if any):\n");
   for event in events {
     prompt.push_str(&format!(
@@ -133,13 +136,10 @@ fn resolve_language(settings: &ReminderSettings) -> String {
   }
 }
 
-impl std::fmt::Debug for SummaryStyle {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let label = match self {
-      SummaryStyle::Concise => "concise",
-      SummaryStyle::Detailed => "detailed",
-      SummaryStyle::Bullet => "bullet",
-    };
-    f.write_str(label)
+fn summary_style_label(style: &SummaryStyle) -> &'static str {
+  match style {
+    SummaryStyle::Concise => "concise",
+    SummaryStyle::Detailed => "detailed",
+    SummaryStyle::Bullet => "bullet",
   }
 }

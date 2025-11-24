@@ -459,5 +459,3 @@ fn sanitize_config_response(state: &AppState, config: &SystemConfig, base: &str)
     service_token_present,
   }
 }
-
-*** End Patch

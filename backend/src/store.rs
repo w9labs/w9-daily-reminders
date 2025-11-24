@@ -84,12 +84,11 @@ impl DataStore {
     }
     match data {
       Some(ref tokens) => write_json(self.root.join(GOOGLE_TOKENS_FILE), tokens).await,
-      None => {
-        match tokio::fs::remove_file(self.root.join(GOOGLE_TOKENS_FILE)).await {
-          Ok(_) | Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-          Err(err) => Err(err.into()),
-        }
-      }
+      None => match tokio::fs::remove_file(self.root.join(GOOGLE_TOKENS_FILE)).await {
+        Ok(_) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err.into()),
+      },
     }
   }
 
