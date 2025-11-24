@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { completeGoogleAuth } from '../../../lib/api'
 
-export default function GoogleCallbackPage() {
+function CallbackContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [status, setStatus] = useState('Validating Google authorization code')
@@ -32,5 +32,13 @@ export default function GoogleCallbackPage() {
       <p>Waiting for Google authorization callback.</p>
       <div className={`status ${error ? 'error' : ''}`}>{error || status}</div>
     </div>
+  )
+}
+
+export default function GoogleCallbackPage() {
+  return (
+    <Suspense fallback={<div className="box">Google OAuth · Loading…</div>}>
+      <CallbackContent />
+    </Suspense>
   )
 }

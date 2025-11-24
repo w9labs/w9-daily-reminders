@@ -1,18 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { MAIL_API_BASE } from '../../../lib/config'
 import { storeToken } from '../../../lib/auth'
 
-export default function VerifyPage() {
+function VerifyContent() {
   const searchParams = useSearchParams()
+  const token = useMemo(() => searchParams.get('token'), [searchParams])
   const router = useRouter()
   const [status, setStatus] = useState<'pending' | 'success' | 'error'>('pending')
   const [message, setMessage] = useState('Verifying your email token…')
 
   useEffect(() => {
-    const token = searchParams.get('token')
     if (!token) {
       setStatus('error')
       setMessage('Missing verification token')
@@ -49,12 +49,20 @@ export default function VerifyPage() {
     return () => {
       cancelled = true
     }
-  }, [router, searchParams])
+  }, [router, token])
 
   return (
     <div className="box">
       <h2 className="section-title">Email verification</h2>
       <div className={`status ${status === 'error' ? 'error' : status === 'success' ? 'success' : ''}`}>{message}</div>
     </div>
+  )
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={<div className="box">Email verification · Loading…</div>}>
+      <VerifyContent />
+    </Suspense>
   )
 }

@@ -1,13 +1,13 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, Suspense, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TurnstileWidget from '../components/Turnstile'
 import { MAIL_API_BASE } from '../../lib/config'
 
-export default function ResetPasswordPage() {
+function ResetContent() {
   const searchParams = useSearchParams()
-  const tokenParam = searchParams.get('token')
+  const tokenParam = useMemo(() => searchParams.get('token'), [searchParams])
   const [email, setEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [status, setStatus] = useState<string | null>(null)
@@ -94,5 +94,13 @@ export default function ResetPasswordPage() {
         </form>
       )}
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="box">Password reset · Loading…</div>}>
+      <ResetContent />
+    </Suspense>
   )
 }
