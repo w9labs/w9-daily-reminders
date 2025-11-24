@@ -43,7 +43,11 @@ struct Choice {
 
 #[derive(Debug, Deserialize)]
 struct ChoiceMessage {
-  content: String,
+  #[serde(default)]
+  content: Option<String>,
+  #[serde(default)]
+  reasoning: Option<String>,
+  role: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,7 +87,7 @@ impl CerebrasClient {
       "messages": [
         {
           "role": "system",
-          "content": "You are W9 Reminders AI. Output JSON with keys subject, preview, html_body, text_body, image_prompt."
+          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. No explanations, no markdown, just the JSON object."
         },
         {
           "role": "user",
@@ -91,7 +95,11 @@ impl CerebrasClient {
         }
       ],
       "temperature": 0.2,
-      "max_tokens": 1200
+      "max_tokens": 2000,
+      "response_format": {
+        "type": "json_object"
+      },
+      "disable_reasoning": true
     });
 
     let resp_text = self
@@ -114,15 +122,23 @@ impl CerebrasClient {
       return Err(CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into())));
     }
 
-    resp
+    let content = resp
       .choices
       .first()
-      .map(|choice| choice.message.content.clone())
-      .filter(|content| !content.trim().is_empty())
+      .and_then(|choice| {
+        // Prefer content field, fallback to reasoning if content is missing
+        choice.message.content.as_ref()
+          .or_else(|| choice.message.reasoning.as_ref())
+      })
+      .filter(|text| !text.trim().is_empty())
       .ok_or_else(|| {
         tracing::error!(body = %resp_text, "Cerebras response missing textual content");
         CerebrasError::Invalid("missing textual content in response".into())
-      })
+      })?;
+
+    // Try to extract JSON from the content if it's wrapped in markdown or has extra text
+    let json_str = extract_json_from_text(content);
+    Ok(json_str)
   }
 }
 
@@ -166,4 +182,31 @@ fn summary_style_label(style: &SummaryStyle) -> &'static str {
     SummaryStyle::Detailed => "detailed",
     SummaryStyle::Bullet => "bullet",
   }
+}
+
+fn extract_json_from_text(text: &str) -> String {
+  // Try to find JSON object in the text
+  // Look for { ... } pattern
+  if let Some(start) = text.find('{') {
+    let mut depth = 0;
+    let mut end = start;
+    for (i, ch) in text[start..].char_indices() {
+      match ch {
+        '{' => depth += 1,
+        '}' => {
+          depth -= 1;
+          if depth == 0 {
+            end = start + i + 1;
+            break;
+          }
+        }
+        _ => {}
+      }
+    }
+    if depth == 0 {
+      return text[start..end].to_string();
+    }
+  }
+  // If no JSON found, return the text as-is (might be plain JSON)
+  text.trim().to_string()
 }
