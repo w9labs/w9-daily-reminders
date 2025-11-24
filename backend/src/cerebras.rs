@@ -11,6 +11,8 @@ pub enum CerebrasError {
   Request(#[from] reqwest::Error),
   #[error("response missing data")]
   Invalid,
+  #[error("cerebras error: {0}")]
+  Api(String),
 }
 
 #[derive(Debug, Serialize)]
@@ -30,6 +32,8 @@ struct ChatMessage<'a> {
 #[derive(Debug, Deserialize)]
 struct ChatResponse {
   choices: Vec<Choice>,
+  #[serde(default)]
+  error: Option<ApiErrorPayload>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,6 +51,13 @@ struct ContentBlock {
   #[serde(rename = "type")]
   kind: String,
   text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiErrorPayload {
+  #[serde(rename = "type")]
+  kind: Option<String>,
+  message: Option<String>,
 }
 
 #[derive(Clone)]
@@ -100,7 +111,7 @@ impl CerebrasClient {
       "max_tokens": 1200
     });
 
-    let resp: ChatResponse = self
+    let resp_text = self
       .http
       .post("https://api.cerebras.ai/v1/chat/completions")
       .bearer_auth(&self.api_key)
@@ -108,16 +119,19 @@ impl CerebrasClient {
       .send()
       .await?
       .error_for_status()? 
-      .json()
+      .text()
       .await?;
 
-    resp
-      .choices
-      .first()
+    let resp: ChatResponse = serde_json::from_str(&resp_text).map_err(|_| CerebrasError::Invalid)?;
+
+    if let Some(err) = resp.error.as_ref() {
+      return Err(CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into())));
+    }
+
+    resp.choices.first()
       .and_then(|choice| {
         choice.message.content.as_ref().and_then(|blocks| {
-          blocks
-            .iter()
+          blocks.iter()
             .find_map(|block| block.text.as_deref())
             .map(|s| s.to_string())
         })
