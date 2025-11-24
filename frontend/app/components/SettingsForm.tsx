@@ -93,8 +93,9 @@ export default function SettingsForm({ onPreview }: Props) {
         return
       }
       setStatus('configuration saved · generating preview')
+      const previewPayload = response.data ?? parse.data
       startTransition(() =>
-        requestPreview(response.data).then((preview) => {
+        requestPreview(previewPayload).then((preview) => {
           if (preview.ok && preview.data) {
             onPreview(preview.data)
             setStatus('preview refreshed')
