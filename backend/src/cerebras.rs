@@ -9,8 +9,8 @@ pub enum CerebrasError {
   MissingKey,
   #[error("request failed: {0}")]
   Request(#[from] reqwest::Error),
-  #[error("response missing data")]
-  Invalid,
+  #[error("response missing data: {0}")]
+  Invalid(String),
   #[error("cerebras error: {0}")]
   Api(String),
 }
@@ -122,7 +122,10 @@ impl CerebrasClient {
       .text()
       .await?;
 
-    let resp: ChatResponse = serde_json::from_str(&resp_text).map_err(|_| CerebrasError::Invalid)?;
+    let resp: ChatResponse = serde_json::from_str(&resp_text).map_err(|err| {
+      tracing::error!(body = %resp_text, error = ?err, "failed to parse Cerebras response");
+      CerebrasError::Invalid("failed to parse Cerebras response".into())
+    })?;
 
     if let Some(err) = resp.error.as_ref() {
       return Err(CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into())));
@@ -140,7 +143,10 @@ impl CerebrasClient {
           })
       })
       .filter(|content| !content.trim().is_empty())
-      .ok_or(CerebrasError::Invalid)
+      .ok_or_else(|| {
+        tracing::error!(body = %resp_text, "Cerebras response missing textual content");
+        CerebrasError::Invalid("missing textual content in response".into())
+      })
   }
 }
 
