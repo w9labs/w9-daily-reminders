@@ -27,6 +27,7 @@ interface TurnstileWidgetProps {
 
 export default function TurnstileWidget({ onVerify, onError }: TurnstileWidgetProps) {
   const ref = useRef<HTMLDivElement | null>(null)
+  const scriptInjected = useRef(false)
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY || !ref.current) {
@@ -47,16 +48,22 @@ export default function TurnstileWidget({ onVerify, onError }: TurnstileWidgetPr
 
     if (window.turnstile) {
       renderWidget()
-    } else {
-      const handler = () => renderWidget()
-      window.addEventListener('turnstile-loaded', handler, { once: true })
-      return () => window.removeEventListener('turnstile-loaded', handler)
+    } else if (!scriptInjected.current) {
+      scriptInjected.current = true
+      const script = document.createElement('script')
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+      script.async = true
+      script.defer = true
+      script.onload = () => renderWidget()
+      script.onerror = () => onError?.()
+      document.head.appendChild(script)
     }
 
     return () => {
       if (widgetId && window.turnstile?.reset) {
         window.turnstile.reset(widgetId)
       }
+      scriptInjected.current = false
     }
   }, [onVerify, onError])
 
