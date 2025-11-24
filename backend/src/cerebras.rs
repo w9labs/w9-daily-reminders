@@ -43,14 +43,7 @@ struct Choice {
 
 #[derive(Debug, Deserialize)]
 struct ChoiceMessage {
-  content: Vec<ContentBlock>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-enum ContentBlock {
-  Text { text: String },
-  JsonSchema { name: Option<String>, schema: Option<serde_json::Value> },
+  content: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,21 +83,11 @@ impl CerebrasClient {
       "messages": [
         {
           "role": "system",
-          "content": [
-            {
-              "type": "text",
-              "text": "You are W9 Reminders AI. Output JSON with keys subject, preview, html_body, text_body, image_prompt."
-            }
-          ]
+          "content": "You are W9 Reminders AI. Output JSON with keys subject, preview, html_body, text_body, image_prompt."
         },
         {
           "role": "user",
-          "content": [
-            {
-              "type": "text",
-              "text": instructions
-            }
-          ]
+          "content": instructions
         }
       ],
       "temperature": 0.2,
@@ -131,17 +114,10 @@ impl CerebrasClient {
       return Err(CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into())));
     }
 
-    resp.choices.first()
-      .and_then(|choice| {
-        choice
-          .message
-          .content
-          .iter()
-          .find_map(|block| match block {
-            ContentBlock::Text { text } if !text.trim().is_empty() => Some(text.clone()),
-            _ => None,
-          })
-      })
+    resp
+      .choices
+      .first()
+      .map(|choice| choice.message.content.clone())
       .filter(|content| !content.trim().is_empty())
       .ok_or_else(|| {
         tracing::error!(body = %resp_text, "Cerebras response missing textual content");
