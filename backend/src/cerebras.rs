@@ -39,7 +39,14 @@ struct Choice {
 
 #[derive(Debug, Deserialize)]
 struct ChoiceMessage {
-  content: Option<String>,
+  content: Option<Vec<ContentBlock>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContentBlock {
+  #[serde(rename = "type")]
+  kind: String,
+  text: Option<String>,
 }
 
 #[derive(Clone)]
@@ -107,7 +114,14 @@ impl CerebrasClient {
     resp
       .choices
       .first()
-      .map(|choice| choice.message.content.clone().unwrap_or_default())
+      .and_then(|choice| {
+        choice.message.content.as_ref().and_then(|blocks| {
+          blocks
+            .iter()
+            .find_map(|block| block.text.as_deref())
+            .map(|s| s.to_string())
+        })
+      })
       .filter(|content| !content.trim().is_empty())
       .ok_or(CerebrasError::Invalid)
   }
