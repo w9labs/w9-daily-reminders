@@ -79,7 +79,13 @@ cargo build --release
 log "Building frontend"
 cd "$ROOT_DIR/frontend"
 if [ -f package-lock.json ]; then
-  npm ci --prefer-offline --no-audit
+  if ! npm ci --prefer-offline --no-audit; then
+    echo "[w9] npm ci failed (likely lockfile drift). Falling back to npm install..."
+    npm install --prefer-offline --no-audit || {
+      echo "[w9] npm install also failed"
+      exit 1
+    }
+  fi
 else
   npm install --prefer-offline --no-audit
 fi
