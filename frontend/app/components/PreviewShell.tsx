@@ -38,14 +38,20 @@ export default function PreviewShell() {
     if (!preview) return
     setSending(true)
     setError('')
+    setStatus('')
     const recipient = settings?.userEmail
-    const res = await sendTestEmail(recipient)
-    if (res.ok) {
-      setStatus('test email sent')
-    } else {
-      setError(res.error || 'failed to send test email')
+    try {
+      const res = await sendTestEmail(recipient)
+      if (res.ok) {
+        setStatus('test email sent')
+      } else {
+        setError(res.error || 'failed to send test email')
+      }
+    } catch (err: any) {
+      setError(err?.message || 'failed to send test email')
+    } finally {
+      setSending(false)
     }
-    setSending(false)
   }, [preview, settings])
 
   useEffect(() => {

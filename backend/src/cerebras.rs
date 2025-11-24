@@ -178,9 +178,9 @@ fn resolve_language(settings: &ReminderSettings) -> String {
 
 fn summary_style_label(style: &SummaryStyle) -> &'static str {
   match style {
-    SummaryStyle::Concise => "concise",
-    SummaryStyle::Detailed => "detailed",
-    SummaryStyle::Bullet => "bullet",
+      SummaryStyle::Concise => "concise",
+      SummaryStyle::Detailed => "detailed",
+      SummaryStyle::Bullet => "bullet",
   }
 }
 

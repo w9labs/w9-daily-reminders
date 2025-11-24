@@ -21,16 +21,16 @@ export default function Header() {
                 Signed in as <span className="mono">{user.email}</span> · {user.role.toUpperCase()}
               </p>
               <div className="actions">
-                <button
-                  type="button"
-                  className="button ghost"
-                  onClick={() => {
-                    clearToken()
-                    window.location.href = '/login'
-                  }}
-                >
-                  Sign out
-                </button>
+              <button
+                type="button"
+                className="button ghost"
+                onClick={() => {
+                  clearToken()
+                  window.location.href = '/login'
+                }}
+              >
+                Sign out
+              </button>
               </div>
             </>
           ) : (

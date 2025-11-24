@@ -3,17 +3,34 @@ import type { ApiResponse, ReminderPreview, ReminderSettings, HealthStatus } fro
 
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   try {
+    const headers = new Headers(init?.headers)
+    if (!headers.has('content-type')) {
+      headers.set('content-type', 'application/json')
+    }
+
     const res = await fetch(`${APP_API_BASE}${path}`, {
-      headers: {
-        'content-type': 'application/json',
-      },
       ...init,
+      headers,
       cache: 'no-store',
     })
 
-    const body = await res.json().catch(() => ({}))
+    const contentType = res.headers.get('content-type') || ''
+    let body: any = {}
+    
+    if (contentType.includes('application/json')) {
+      try {
+        const text = await res.text()
+        body = text ? JSON.parse(text) : {}
+      } catch (parseError) {
+        return { ok: false, error: `Invalid JSON response: ${parseError instanceof Error ? parseError.message : 'parse error'}` }
+      }
+    } else {
+      const text = await res.text()
+      return { ok: false, error: text || `HTTP ${res.status}: ${res.statusText}` }
+    }
+
     if (!res.ok) {
-      return { ok: false, error: body.error || 'request failed' }
+      return { ok: false, error: body.error || body.message || `HTTP ${res.status}: ${res.statusText}` }
     }
 
     return { ok: true, data: body.data as T }

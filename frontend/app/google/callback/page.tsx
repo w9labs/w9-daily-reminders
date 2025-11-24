@@ -29,7 +29,7 @@ function CallbackContent() {
   return (
     <div className="box">
       <h2 className="section-title">Google OAuth</h2>
-      <p>Waiting for Google authorization callback.</p>
+        <p>Waiting for Google authorization callback.</p>
       <div className={`status ${error ? 'error' : ''}`}>{error || status}</div>
     </div>
   )
