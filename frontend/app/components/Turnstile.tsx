@@ -14,7 +14,7 @@ declare global {
           callback?: (token: string) => void
           'error-callback'?: () => void
         }
-      ) => string | void
+      ) => string
       reset?: (widgetId?: string) => void
     }
   }
@@ -36,12 +36,13 @@ export default function TurnstileWidget({ onVerify, onError }: TurnstileWidgetPr
 
     function renderWidget() {
       if (!window.turnstile || !ref.current) return
-      widgetId = window.turnstile.render(ref.current, {
+      const id = window.turnstile.render(ref.current, {
         sitekey: TURNSTILE_SITE_KEY,
         theme: 'dark',
         callback: (token: string) => onVerify?.(token),
         'error-callback': () => onError?.(),
       })
+      widgetId = id
     }
 
     if (window.turnstile) {
