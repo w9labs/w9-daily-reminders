@@ -14,7 +14,7 @@ declare global {
           callback?: (token: string) => void
           'error-callback'?: () => void
         }
-      ) => void
+      ) => string | void
       reset?: (widgetId?: string) => void
     }
   }
