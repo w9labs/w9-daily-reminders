@@ -6,7 +6,9 @@ export const SUMMARY_STYLES = [
   { id: 'bullet', label: 'Bullet · Checklist voice' },
 ]
 
-export const DEFAULT_SETTINGS = {
+import type { ReminderSettings } from './types'
+
+export const DEFAULT_SETTINGS: Omit<ReminderSettings, 'userEmail'> = {
   reminderTime: '07:30',
   timezone: 'Europe/Stockholm',
   language: 'English',
