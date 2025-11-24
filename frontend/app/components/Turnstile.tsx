@@ -28,26 +28,44 @@ interface TurnstileWidgetProps {
 export default function TurnstileWidget({ onVerify, onError }: TurnstileWidgetProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const scriptInjected = useRef(false)
+  const latestVerify = useRef(onVerify)
+  const latestError = useRef(onError)
+
+  useEffect(() => {
+    latestVerify.current = onVerify
+  }, [onVerify])
+
+  useEffect(() => {
+    latestError.current = onError
+  }, [onError])
 
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY || !ref.current) {
       return
     }
+
     let widgetId: string | undefined
 
     function renderWidget() {
       if (!window.turnstile || !ref.current) return
+      if (ref.current.firstChild) {
+        ref.current.innerHTML = ''
+      }
       const id = window.turnstile.render(ref.current, {
         sitekey: TURNSTILE_SITE_KEY,
         theme: 'dark',
-        callback: (token: string) => onVerify?.(token),
-        'error-callback': () => onError?.(),
+        callback: (token: string) => latestVerify.current?.(token),
+        'error-callback': () => latestError.current?.(),
       })
       widgetId = id
     }
 
+    const existing = document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')
+
     if (window.turnstile) {
       renderWidget()
+    } else if (existing) {
+      existing.addEventListener('load', renderWidget, { once: true })
     } else if (!scriptInjected.current) {
       scriptInjected.current = true
       const script = document.createElement('script')
@@ -55,7 +73,7 @@ export default function TurnstileWidget({ onVerify, onError }: TurnstileWidgetPr
       script.async = true
       script.defer = true
       script.onload = () => renderWidget()
-      script.onerror = () => onError?.()
+      script.onerror = () => latestError.current?.()
       document.head.appendChild(script)
     }
 
@@ -63,9 +81,8 @@ export default function TurnstileWidget({ onVerify, onError }: TurnstileWidgetPr
       if (widgetId && window.turnstile?.reset) {
         window.turnstile.reset(widgetId)
       }
-      scriptInjected.current = false
     }
-  }, [onVerify, onError])
+  }, [])
 
   if (!TURNSTILE_SITE_KEY) {
     return null
