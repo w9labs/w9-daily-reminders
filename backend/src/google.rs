@@ -1,5 +1,5 @@
 use crate::models::{CalendarEvent, GoogleTokens};
-use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use serde::Deserialize;
 use thiserror::Error;
 use uuid::Uuid;
@@ -182,7 +182,7 @@ fn parse_dt(value: GoogleDateTime) -> Result<DateTime<Utc>, GoogleError> {
     NaiveDate::parse_from_str(&date, "%Y-%m-%d")
       .map_err(|err| GoogleError::TimeParse(err.to_string()))
       .map(|d| NaiveDateTime::new(d, NaiveTime::from_hms_opt(0, 0, 0).unwrap()))
-      .map(|dt| DateTime::<Utc>::from_utc(dt, Utc))
+      .map(|dt| Utc.from_utc_datetime(&dt))
   } else {
     Err(GoogleError::Invalid("start"))
   }

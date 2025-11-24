@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
   cerebras::{CerebrasClient, CerebrasError},
-  email::build_preview,
+  email::{build_preview, EmailBuildError},
   google::{GoogleClient, GoogleError},
   models::{
     ApiResponse, CalendarEvent, GoogleAuthPayload, GoogleAuthResult, GoogleAuthStartResponse, GoogleTokens, HealthStatus, MailSenderOption,
@@ -169,7 +169,6 @@ pub async fn system_config_update(
 ) -> Result<Json<ApiResponse<SystemConfigResponse>>, ApiError> {
   let token = extract_bearer(&headers)?;
   let mut config = state.store.read_config();
-  let base = state.resolve_mail_base(&config);
   require_admin(&state, &config, &token).await?;
 
   if let Some(new_base_raw) = payload.mail_api_base {
@@ -350,6 +349,7 @@ pub enum ApiError {
   Cerebras(CerebrasError),
   Google(GoogleError),
   Pollinations(PollinationsError),
+  Email(EmailBuildError),
   W9Mail(W9MailError),
   Serde(serde_json::Error),
   Unavailable(&'static str),
@@ -394,6 +394,11 @@ impl From<W9MailError> for ApiError {
     }
   }
 }
+impl From<EmailBuildError> for ApiError {
+  fn from(value: EmailBuildError) -> Self {
+    ApiError::Email(value)
+  }
+}
 
 impl axum::response::IntoResponse for ApiError {
   fn into_response(self) -> axum::response::Response {
@@ -402,7 +407,7 @@ impl axum::response::IntoResponse for ApiError {
       ApiError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
       ApiError::Store(_) | ApiError::Serde(_) => StatusCode::INTERNAL_SERVER_ERROR,
       ApiError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
-      ApiError::Weather(_) | ApiError::Cerebras(_) | ApiError::Pollinations(_) | ApiError::Google(_) | ApiError::W9Mail(_) => {
+      ApiError::Weather(_) | ApiError::Cerebras(_) | ApiError::Pollinations(_) | ApiError::Google(_) | ApiError::W9Mail(_) | ApiError::Email(_) => {
         StatusCode::BAD_GATEWAY
       }
     };
@@ -415,6 +420,7 @@ impl axum::response::IntoResponse for ApiError {
       ApiError::Pollinations(err) => err.to_string(),
       ApiError::Serde(err) => err.to_string(),
       ApiError::W9Mail(err) => err.to_string(),
+      ApiError::Email(err) => err.to_string(),
       ApiError::Unauthorized(reason) => reason.to_string(),
     };
     let payload = serde_json::json!({ "error": message });
