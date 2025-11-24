@@ -71,9 +71,12 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> Str
     })
     .unwrap_or_default();
 
-  // html_body from Cerebras is already HTML, don't escape it
-  // Just use it directly
-  let html_body = inner;
+  // html_body from Cerebras is already HTML, but we need to ensure all text has proper color
+  // Wrap content in a div that ensures text color is set
+  let html_body = format!(
+    r#"<div style="color:#fdfdfd;">{}</div>"#,
+    inner
+  );
 
   format!(
     r#"<!DOCTYPE html>
