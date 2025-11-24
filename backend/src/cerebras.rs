@@ -43,14 +43,14 @@ struct Choice {
 
 #[derive(Debug, Deserialize)]
 struct ChoiceMessage {
-  content: Option<Vec<ContentBlock>>,
+  content: Vec<ContentBlock>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ContentBlock {
-  #[serde(rename = "type")]
-  kind: String,
-  text: Option<String>,
+#[serde(tag = "type", rename_all = "lowercase")]
+enum ContentBlock {
+  Text { text: String },
+  JsonSchema { name: Option<String>, schema: Option<serde_json::Value> },
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,11 +130,14 @@ impl CerebrasClient {
 
     resp.choices.first()
       .and_then(|choice| {
-        choice.message.content.as_ref().and_then(|blocks| {
-          blocks.iter()
-            .find_map(|block| block.text.as_deref())
-            .map(|s| s.to_string())
-        })
+        choice
+          .message
+          .content
+          .iter()
+          .find_map(|block| match block {
+            ContentBlock::Text { text } if !text.trim().is_empty() => Some(text.clone()),
+            _ => None,
+          })
       })
       .filter(|content| !content.trim().is_empty())
       .ok_or(CerebrasError::Invalid)
