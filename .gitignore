@@ -1,0 +1,10 @@
+frontend-example.jpg
+frontend/node_modules
+frontend/.next
+frontend/.turbo
+frontend/.env
+frontend/package-lock.json
+backend/target
+backend/.env
+backend/data/*.json
+ARCHITECTURE.md
