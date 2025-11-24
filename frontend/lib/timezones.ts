@@ -1,12 +1,11 @@
-export const TIMEZONES = [
+import { timeZonesNames } from '@vvo/tzdb'
+
+export const TIMEZONES: string[] = Array.isArray(timeZonesNames) && timeZonesNames.length > 0 ? timeZonesNames : [
   'UTC',
-  'Europe/Stockholm',
-  'Europe/Paris',
   'Europe/London',
+  'Europe/Stockholm',
   'America/New_York',
   'America/Los_Angeles',
-  'America/Sao_Paulo',
-  'Asia/Singapore',
   'Asia/Tokyo',
-  'Australia/Sydney'
+  'Australia/Sydney',
 ]
