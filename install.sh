@@ -149,12 +149,40 @@ RestartSec=2
 WantedBy=multi-user.target
 UNIT
 
+log "Preparing origin TLS certificate"
+SSL_DIR=${ORIGIN_SSL_DIR:-/etc/nginx/ssl/$SERVICE_NAME}
+SSL_CERT=${ORIGIN_SSL_CERT:-$SSL_DIR/cert.pem}
+SSL_KEY=${ORIGIN_SSL_KEY:-$SSL_DIR/key.pem}
+
+if [ ! -f "$SSL_CERT" ] || [ ! -f "$SSL_KEY" ]; then
+  log "Generating self-signed certificate for $DOMAIN at $SSL_DIR"
+  $SUDO mkdir -p "$SSL_DIR"
+  $SUDO openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout "$SSL_KEY" \
+    -out "$SSL_CERT" \
+    -subj "/CN=$DOMAIN" >/dev/null 2>&1
+  $SUDO chmod 600 "$SSL_KEY"
+  $SUDO chmod 644 "$SSL_CERT"
+fi
+
 log "Configuring nginx"
 $SUDO tee /etc/nginx/sites-available/$SERVICE_NAME >/dev/null <<NGINX
 server {
     listen 80;
     listen [::]:80;
     server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $DOMAIN;
+
+    ssl_certificate $SSL_CERT;
+    ssl_certificate_key $SSL_KEY;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
 
     root $FRONTEND_DIST;
     index index.html;
