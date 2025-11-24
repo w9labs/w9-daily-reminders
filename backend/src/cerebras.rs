@@ -39,7 +39,7 @@ struct Choice {
 
 #[derive(Debug, Deserialize)]
 struct ChoiceMessage {
-  content: String,
+  content: Option<String>,
 }
 
 #[derive(Clone)]
@@ -67,21 +67,31 @@ impl CerebrasClient {
     weather: Option<&str>,
   ) -> Result<String, CerebrasError> {
     let instructions = build_prompt(settings, events, weather);
-    let req = ChatRequest {
-      model: &self.model,
-      messages: vec![
-        ChatMessage {
-          role: "system",
-          content: "You are W9 Reminders AI. Output JSON with keys subject, preview, html_body, text_body, image_prompt",
+    let req = serde_json::json!({
+      "model": self.model,
+      "messages": [
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are W9 Reminders AI. Output JSON with keys subject, preview, html_body, text_body, image_prompt."
+            }
+          ]
         },
-        ChatMessage {
-          role: "user",
-          content: &instructions,
-        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": instructions
+            }
+          ]
+        }
       ],
-      temperature: 0.2,
-      max_tokens: 1200,
-    };
+      "temperature": 0.2,
+      "max_tokens": 1200
+    });
 
     let resp: ChatResponse = self
       .http
@@ -97,7 +107,8 @@ impl CerebrasClient {
     resp
       .choices
       .first()
-      .map(|choice| choice.message.content.clone())
+      .map(|choice| choice.message.content.clone().unwrap_or_default())
+      .filter(|content| !content.trim().is_empty())
       .ok_or(CerebrasError::Invalid)
   }
 }
