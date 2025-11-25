@@ -6,6 +6,8 @@ export interface CalendarEvent {
   location?: string
 }
 
+export type ImageProvider = 'pollinations' | 'cloudflare'
+
 export interface ReminderSettings {
   userEmail: string
   reminderTime: string
@@ -15,7 +17,9 @@ export interface ReminderSettings {
   weatherLocation: string
   includeWeather: boolean
   includeImage: boolean
+  imageProvider: ImageProvider
   imageModel?: string
+  cloudflareModel?: string
   summaryStyle: 'concise' | 'detailed' | 'bullet'
 }
 
@@ -39,4 +43,9 @@ export interface ApiResponse<T> {
   ok: boolean
   data?: T
   error?: string
+}
+
+export interface ImageModelOptions {
+  pollinations: string[]
+  cloudflare: string[]
 }

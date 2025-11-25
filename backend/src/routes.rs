@@ -11,11 +11,12 @@ use uuid::Uuid;
 
 use crate::{
   cerebras::{CerebrasClient, CerebrasError},
+  cloudflare::CloudflareAiClient,
   email::{build_preview, EmailBuildError},
   google::{GoogleClient, GoogleError},
   models::{
-    ApiResponse, CalendarEvent, GoogleAuthPayload, GoogleAuthResult, GoogleAuthStartResponse, GoogleTokens, HealthStatus, MailSenderOption,
-    ReminderPreview, ReminderSettings, SenderSelection, SystemConfig,
+    ApiResponse, CalendarEvent, GoogleAuthPayload, GoogleAuthResult, GoogleAuthStartResponse, GoogleTokens, HealthStatus, ImageModelOptions,
+    ImageProvider, MailSenderOption, ReminderPreview, ReminderSettings, SenderSelection, SystemConfig,
   },
   pollinations::{PollinationsClient, PollinationsError},
   store::DataStore,
@@ -29,6 +30,7 @@ pub struct AppState {
   weather: Arc<WeatherClient>,
   cerebras: Arc<Option<CerebrasClient>>,
   pollinations: Arc<PollinationsClient>,
+  cloudflare: Arc<Option<CloudflareAiClient>>,
   google: Arc<Option<GoogleClient>>,
   mail_client: Arc<W9MailClient>,
   mail_api_base: String,
@@ -45,12 +47,14 @@ impl AppState {
         PollinationsClient::fallback()
       })
     );
+    let cloudflare = Arc::new(CloudflareAiClient::new().ok());
     let google = Arc::new(GoogleClient::new().ok());
     Self {
       store,
       weather,
       cerebras,
       pollinations,
+      cloudflare,
       google,
       mail_client: Arc::new(mail_client),
       mail_api_base,
@@ -210,9 +214,12 @@ pub async fn system_config_update(
 
 pub async fn get_image_models(
   State(state): State<AppState>,
-) -> Result<Json<ApiResponse<Vec<String>>>, ApiError> {
-  let models = state.pollinations.get_available_models().await?;
-  Ok(Json(ApiResponse { data: models }))
+) -> Result<Json<ApiResponse<ImageModelOptions>>, ApiError> {
+  let pollinations = state.pollinations.get_available_models().await?;
+  let cloudflare = CloudflareAiClient::supported_models();
+  Ok(Json(ApiResponse {
+    data: ImageModelOptions { pollinations, cloudflare },
+  }))
 }
 
 pub async fn list_mail_senders(
@@ -331,9 +338,24 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
   let mut image_url = None;
   if payload.include_image {
     if let Ok(prompt) = extract_image_prompt(&raw) {
-      match state.pollinations.generate(&prompt, payload.image_model.as_deref()).await {
-        Ok(url) => image_url = Some(url),
-        Err(err) => tracing::warn!(?err, "pollinations generation failed"),
+      match payload.image_provider {
+        ImageProvider::Pollinations => {
+          match state.pollinations.generate(&prompt, payload.image_model.as_deref()).await {
+            Ok(url) => image_url = Some(url),
+            Err(err) => tracing::warn!(?err, "pollinations generation failed"),
+          }
+        }
+        ImageProvider::Cloudflare => {
+          let client = state
+            .cloudflare
+            .as_ref()
+            .as_ref()
+            .ok_or(ApiError::Unavailable("Cloudflare Workers AI not configured"))?;
+          match client.generate(&prompt, payload.cloudflare_model.as_deref()).await {
+            Ok(url) => image_url = Some(url),
+            Err(err) => tracing::warn!(?err, "cloudflare image generation failed"),
+          }
+        }
       }
     }
   }

@@ -9,7 +9,9 @@ export const reminderSettingsSchema = z.object({
   weatherLocation: z.string().min(2),
   includeWeather: z.boolean(),
   includeImage: z.boolean(),
+  imageProvider: z.enum(['pollinations', 'cloudflare']),
   imageModel: z.string().optional(),
+  cloudflareModel: z.string().optional(),
   summaryStyle: z.enum(['concise', 'detailed', 'bullet']),
 })
 

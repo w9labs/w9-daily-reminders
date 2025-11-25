@@ -14,8 +14,12 @@ pub struct ReminderSettings {
   pub weather_location: String,
   pub include_weather: bool,
   pub include_image: bool,
+  #[serde(default = "default_image_provider")]
+  pub image_provider: ImageProvider,
   #[serde(default)]
   pub image_model: Option<String>,
+  #[serde(default)]
+  pub cloudflare_model: Option<String>,
   #[serde(default = "default_summary_style")]
   pub summary_style: SummaryStyle,
 }
@@ -24,12 +28,23 @@ fn default_summary_style() -> SummaryStyle {
   SummaryStyle::Concise
 }
 
+fn default_image_provider() -> ImageProvider {
+  ImageProvider::Pollinations
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SummaryStyle {
   Concise,
   Detailed,
   Bullet,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageProvider {
+  Pollinations,
+  Cloudflare,
 }
 
 impl Default for ReminderSettings {
@@ -43,7 +58,9 @@ impl Default for ReminderSettings {
       weather_location: "Stockholm, Sweden".into(),
       include_weather: true,
       include_image: true,
+      image_provider: ImageProvider::Pollinations,
       image_model: None,
+      cloudflare_model: None,
       summary_style: SummaryStyle::Concise,
     }
   }
@@ -58,6 +75,13 @@ pub struct ReminderPreview {
   pub weather_advisory: Option<String>,
   pub image_url: Option<String>,
   pub generated_language: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageModelOptions {
+  pub pollinations: Vec<String>,
+  pub cloudflare: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

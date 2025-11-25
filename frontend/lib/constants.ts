@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS: Omit<ReminderSettings, 'userEmail'> = {
   weatherLocation: 'Stockholm, Sweden',
   includeWeather: true,
   includeImage: true,
+  imageProvider: 'pollinations',
+  cloudflareModel: '@cf/black-forest-labs/flux-1-schnell',
   summaryStyle: 'concise',
 }
 

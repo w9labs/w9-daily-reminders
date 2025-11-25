@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { reminderSettingsSchema } from '../../lib/schemas'
 import { DEFAULT_SETTINGS, LANGUAGES, SUMMARY_STYLES } from '../../lib/constants'
 import { TIMEZONES } from '../../lib/timezones'
-import type { ReminderSettings } from '../../lib/types'
+import type { ImageModelOptions, ReminderSettings } from '../../lib/types'
 import { getImageModels, getSettings, saveSettings, startGoogleAuth } from '../../lib/api'
 
 const customOptionValue = 'custom'
@@ -33,7 +33,7 @@ export default function SettingsForm() {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<string>('waiting for configuration')
   const [error, setError] = useState<string>('')
-  const [imageModels, setImageModels] = useState<string[]>([])
+  const [imageModels, setImageModels] = useState<ImageModelOptions>({ pollinations: [], cloudflare: [] })
   const [loadingModels, setLoadingModels] = useState(false)
 
   useEffect(() => {
@@ -82,6 +82,16 @@ export default function SettingsForm() {
 
   const update = <K extends keyof ReminderSettings>(key: K, value: ReminderSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleProviderChange = (provider: ReminderSettings['imageProvider']) => {
+    setSettings((prev) => {
+      const next: ReminderSettings = { ...prev, imageProvider: provider }
+      if (provider === 'cloudflare' && !next.cloudflareModel) {
+        next.cloudflareModel = imageModels.cloudflare[0] || DEFAULT_SETTINGS.cloudflareModel
+      }
+      return next
+    })
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -229,29 +239,81 @@ export default function SettingsForm() {
               checked={settings.includeImage}
               onChange={(event) => update('includeImage', event.target.checked)}
             />
-            &nbsp;Pollinations visual
+            &nbsp;AI visual
           </label>
         </div>
       </div>
 
       {settings.includeImage && (
-        <div className="row">
-          <label htmlFor="imageModel">Image model</label>
-          <select
-            id="imageModel"
-            value={settings.imageModel || ''}
-            onChange={(event) => update('imageModel', event.target.value || undefined)}
-          >
-            <option value="">Default (flux)</option>
-            {imageModels.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
-            ))}
-          </select>
-          {loadingModels && <small>Loading available models...</small>}
-          <small>Available models refresh every 5 minutes. Current selection: {settings.imageModel || 'flux (default)'}</small>
-        </div>
+        <>
+          <div className="row">
+            <label>Image provider</label>
+            <div className="actions">
+              <label className="nav-link" style={{ cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="imageProvider"
+                  value="pollinations"
+                  checked={settings.imageProvider === 'pollinations'}
+                  onChange={() => handleProviderChange('pollinations')}
+                />
+                &nbsp;Pollinations.ai
+              </label>
+              <label className="nav-link" style={{ cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="imageProvider"
+                  value="cloudflare"
+                  checked={settings.imageProvider === 'cloudflare'}
+                  onChange={() => handleProviderChange('cloudflare')}
+                />
+                &nbsp;Cloudflare Workers AI
+              </label>
+            </div>
+            <small>Pollinations uses your bearer token; Cloudflare Workers AI renders via your Cloudflare account.</small>
+          </div>
+
+          {settings.imageProvider === 'pollinations' && (
+            <div className="row">
+              <label htmlFor="imageModel">Pollinations model</label>
+              <select
+                id="imageModel"
+                value={settings.imageModel || ''}
+                onChange={(event) => update('imageModel', event.target.value || undefined)}
+              >
+                <option value="">Default (flux)</option>
+                {imageModels.pollinations.length === 0 && <option value="" disabled>No Pollinations models available</option>}
+                {imageModels.pollinations.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+              {loadingModels && <small>Loading available models…</small>}
+              <small>Available models refresh every 5 minutes. Current selection: {settings.imageModel || 'flux (default)'}</small>
+            </div>
+          )}
+
+          {settings.imageProvider === 'cloudflare' && (
+            <div className="row">
+              <label htmlFor="cloudflareModel">Cloudflare model</label>
+              <select
+                id="cloudflareModel"
+                value={settings.cloudflareModel || imageModels.cloudflare[0] || ''}
+                onChange={(event) => update('cloudflareModel', event.target.value || undefined)}
+              >
+                {imageModels.cloudflare.length === 0 && <option value="" disabled>No Cloudflare models available</option>}
+                {imageModels.cloudflare.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+              {loadingModels && <small>Loading available models…</small>}
+              <small>Executes on your Cloudflare account via Workers AI.</small>
+            </div>
+          )}
+        </>
       )}
 
       <div className="row">

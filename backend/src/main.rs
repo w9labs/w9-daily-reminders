@@ -3,6 +3,7 @@ mod store;
 mod weather;
 mod cerebras;
 mod pollinations;
+mod cloudflare;
 mod email;
 mod routes;
 mod google;

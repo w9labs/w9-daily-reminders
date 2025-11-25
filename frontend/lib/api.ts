@@ -1,5 +1,5 @@
 import { APP_API_BASE } from './config'
-import type { ApiResponse, ReminderPreview, ReminderSettings, HealthStatus } from './types'
+import type { ApiResponse, ReminderPreview, ReminderSettings, HealthStatus, ImageModelOptions } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   try {
@@ -83,7 +83,7 @@ export function sendTestEmail(recipient?: string) {
 }
 
 export function getImageModels() {
-  return request<string[]>('/api/system/image-models', { method: 'GET' })
+  return request<ImageModelOptions>('/api/system/image-models', { method: 'GET' })
 }
 
 function getStoredToken(): string | null {
