@@ -152,20 +152,8 @@ impl CerebrasClient {
     // content should already be valid JSON per structured output contract
     // but guard by ensuring it's valid JSON; if not, attempt to extract
     let sanitized_content = sanitize_control_chars(content);
-    let normalized_value = match serde_json::from_str::<Value>(&sanitized_content) {
-      Ok(value) => value,
-      Err(_) => {
-        let extracted = extract_json_from_text(&sanitized_content);
-        serde_json::from_str::<Value>(&extracted).map_err(|err| {
-          tracing::error!(error = ?err, "failed to sanitize Cerebras JSON payload");
-          CerebrasError::Invalid("failed to sanitize Cerebras response".into())
-        })?
-      }
-    };
-    serde_json::to_string(&normalized_value).map_err(|err| {
-      tracing::error!(error = ?err, "failed to serialize normalized Cerebras payload");
-      CerebrasError::Invalid("failed to serialize Cerebras response".into())
-    })
+    let extracted = extract_json_from_text(&sanitized_content);
+    Ok(extracted)
   }
 }
 
