@@ -7,7 +7,6 @@ use serde::Deserialize;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
-use tracing::warn;
 
 #[derive(Debug, Error)]
 pub enum PollinationsError {
@@ -137,11 +136,8 @@ impl PollinationsClient {
       return Err(PollinationsError::MissingPrompt);
     }
 
-    // Authenticated endpoint when API key is available, otherwise public URL fallback
-    if let Some(api_key) = &self.api_key {
-      return self.generate_via_api(trimmed, api_key, model).await;
-    }
-    Ok(self.build_public_url(trimmed, model))
+    let api_key = self.api_key.as_deref().ok_or(PollinationsError::MissingKey)?;
+    self.generate_via_api(trimmed, api_key, model).await
   }
 
   async fn generate_via_api(&self, prompt: &str, api_key: &str, model: Option<&str>) -> Result<String, PollinationsError> {
@@ -184,14 +180,6 @@ impl PollinationsClient {
 
     if !status.is_success() {
       let body = response.text().await.unwrap_or_default();
-      if status.is_server_error() {
-        warn!(
-          %status,
-          %body,
-          "pollinations enter API server error, falling back to public image url"
-        );
-        return Ok(self.build_public_url(prompt, model));
-      }
       return Err(PollinationsError::Api(format!(
         "Pollinations request failed ({}): {}",
         status, body
@@ -213,16 +201,5 @@ impl PollinationsClient {
     std::env::var("POLLINATIONS_REFERRER").unwrap_or_else(|_| "https://reminder.w9.nu/".to_string())
   }
 
-  fn build_public_url(&self, prompt: &str, model: Option<&str>) -> String {
-    let encoded = urlencoding::encode(prompt);
-    let seed = Utc::now().timestamp();
-    let model_param = model
-      .map(|m| format!("&model={}", urlencoding::encode(m)))
-      .unwrap_or_default();
-    format!(
-      "https://image.pollinations.ai/prompt/{}?width=1024&height=341&seed={}{}",
-      encoded, seed, model_param
-    )
-  }
 }
 
