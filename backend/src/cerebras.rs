@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use thiserror::Error;
 
 use crate::models::{CalendarEvent, ReminderSettings, SummaryStyle};
@@ -137,7 +137,10 @@ impl CerebrasClient {
       .first()
       .and_then(|choice| {
         // Prefer content field, fallback to reasoning if content is missing
-        choice.message.content.as_ref()
+        choice
+          .message
+          .content
+          .as_ref()
           .or_else(|| choice.message.reasoning.as_ref())
       })
       .filter(|text| !text.trim().is_empty())
@@ -146,9 +149,13 @@ impl CerebrasClient {
         CerebrasError::Invalid("missing textual content in response".into())
       })?;
 
-    // Try to extract JSON from the content if it's wrapped in markdown or has extra text
-    let json_str = extract_json_from_text(content);
-    Ok(json_str)
+    // content should already be valid JSON per structured output contract
+    // but guard by ensuring it's valid JSON; if not, attempt to extract
+    let validated = match serde_json::from_str::<Value>(content) {
+      Ok(_) => content.to_string(),
+      Err(_) => extract_json_from_text(content),
+    };
+    Ok(validated)
   }
 }
 

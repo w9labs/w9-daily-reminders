@@ -11,6 +11,8 @@ static CLOUDFLARE_MODELS: &[&str] = &[
   "@cf/black-forest-labs/flux-2-dev",
   "@cf/black-forest-labs/flux-1-schnell",
   "@cf/bytedance/stable-diffusion-xl-lightning",
+  "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+  "@cf/runwayml/stable-diffusion-v1-5-inpainting",
 ];
 
 #[derive(Debug, Error)]
@@ -120,12 +122,22 @@ struct CloudflareResult {
 fn build_payload(model: &str, prompt: &str) -> serde_json::Value {
   let seed = Utc::now().timestamp();
   match model {
-    "@cf/bytedance/stable-diffusion-xl-lightning" => serde_json::json!({
+    "@cf/bytedance/stable-diffusion-xl-lightning"
+    | "@cf/stabilityai/stable-diffusion-xl-base-1.0" => serde_json::json!({
       "prompt": prompt,
       "width": 1024,
       "height": 256,
       "num_steps": 8,
       "guidance": 5,
+      "seed": seed,
+    }),
+    "@cf/runwayml/stable-diffusion-v1-5-inpainting" => serde_json::json!({
+      "prompt": prompt,
+      "width": 1024,
+      "height": 256,
+      "num_steps": 20,
+      "guidance": 7.5,
+      "strength": 0.9,
       "seed": seed,
     }),
     "@cf/black-forest-labs/flux-2-dev" | "@cf/black-forest-labs/flux-1-schnell" => serde_json::json!({
