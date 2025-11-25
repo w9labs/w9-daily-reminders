@@ -5,7 +5,7 @@ import { reminderSettingsSchema } from '../../lib/schemas'
 import { DEFAULT_SETTINGS, LANGUAGES, SUMMARY_STYLES } from '../../lib/constants'
 import { TIMEZONES } from '../../lib/timezones'
 import type { ReminderPreview, ReminderSettings } from '../../lib/types'
-import { getSettings, requestPreview, saveSettings, startGoogleAuth } from '../../lib/api'
+import { getImageModels, getSettings, requestPreview, saveSettings, startGoogleAuth } from '../../lib/api'
 
 interface Props {
   onPreview(preview: ReminderPreview): void
@@ -38,6 +38,8 @@ export default function SettingsForm({ onPreview }: Props) {
   const [status, setStatus] = useState<string>('waiting for configuration')
   const [error, setError] = useState<string>('')
   const [isPending, startTransition] = useTransition()
+  const [imageModels, setImageModels] = useState<string[]>([])
+  const [loadingModels, setLoadingModels] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -52,6 +54,21 @@ export default function SettingsForm({ onPreview }: Props) {
         }))
         setLanguageChoice(normalized.choice)
         setStatus('restored saved configuration')
+      }
+    })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    setLoadingModels(true)
+    getImageModels().then((res) => {
+      if (!mounted) return
+      setLoadingModels(false)
+      if (res.ok && res.data) {
+        setImageModels(res.data)
       }
     })
     return () => {
@@ -233,6 +250,26 @@ export default function SettingsForm({ onPreview }: Props) {
           </label>
         </div>
       </div>
+
+      {settings.includeImage && (
+        <div className="row">
+          <label htmlFor="imageModel">Image model</label>
+          <select
+            id="imageModel"
+            value={settings.imageModel || ''}
+            onChange={(event) => update('imageModel', event.target.value || undefined)}
+          >
+            <option value="">Default (flux)</option>
+            {imageModels.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+          {loadingModels && <small>Loading available models...</small>}
+          <small>Available models change every 4 hours. Current selection: {settings.imageModel || 'flux (default)'}</small>
+        </div>
+      )}
 
       <div className="row">
         <label>Summary voice</label>

@@ -208,6 +208,13 @@ pub async fn system_config_update(
   Ok(Json(ApiResponse { data: response }))
 }
 
+pub async fn get_image_models(
+  State(state): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<String>>>, ApiError> {
+  let models = state.pollinations.get_available_models().await?;
+  Ok(Json(ApiResponse { data: models }))
+}
+
 pub async fn list_mail_senders(
   State(state): State<AppState>,
   headers: HeaderMap,
@@ -324,7 +331,7 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
   let mut image_url = None;
   if payload.include_image {
     if let Ok(prompt) = extract_image_prompt(&raw) {
-      match state.pollinations.generate(&prompt).await {
+      match state.pollinations.generate(&prompt, payload.image_model.as_deref()).await {
         Ok(url) => image_url = Some(url),
         Err(err) => tracing::warn!(?err, "pollinations generation failed"),
       }

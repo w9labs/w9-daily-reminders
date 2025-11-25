@@ -15,6 +15,7 @@ export interface ReminderSettings {
   weatherLocation: string
   includeWeather: boolean
   includeImage: boolean
+  imageModel?: string
   summaryStyle: 'concise' | 'detailed' | 'bullet'
 }
 

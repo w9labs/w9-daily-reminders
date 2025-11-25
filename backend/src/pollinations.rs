@@ -1,5 +1,7 @@
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use parking_lot::RwLock;
+use std::sync::Arc;
+use std::time::SystemTime;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -17,10 +19,17 @@ pub enum PollinationsError {
 // Removed unused structs - Pollinations image API uses GET with URL parameters, not POST with JSON
 
 #[derive(Clone)]
+struct CachedModels {
+  models: Vec<String>,
+  fetched_at: SystemTime,
+}
+
+#[derive(Clone)]
 pub struct PollinationsClient {
   http: reqwest::Client,
   api_key: Option<String>,
   api_base: String,
+  cached_models: Arc<RwLock<Option<CachedModels>>>,
 }
 
 impl PollinationsClient {
@@ -33,6 +42,7 @@ impl PollinationsClient {
       http: reqwest::Client::new(),
       api_key,
       api_base,
+      cached_models: Arc::new(RwLock::new(None)),
     })
   }
 
@@ -42,10 +52,56 @@ impl PollinationsClient {
       http: reqwest::Client::new(),
       api_key: None,
       api_base: "https://api.pollinations.ai".into(),
+      cached_models: Arc::new(RwLock::new(None)),
     }
   }
 
-  pub async fn generate(&self, prompt: &str) -> Result<String, PollinationsError> {
+  pub async fn get_available_models(&self) -> Result<Vec<String>, PollinationsError> {
+    // Check cache first (4 hours = 14400 seconds)
+    const CACHE_DURATION_SECS: u64 = 4 * 60 * 60;
+    
+    {
+      let cache = self.cached_models.read();
+      if let Some(cached) = cache.as_ref() {
+        if let Ok(elapsed) = cached.fetched_at.elapsed() {
+          if elapsed.as_secs() < CACHE_DURATION_SECS {
+            return Ok(cached.models.clone());
+          }
+        }
+      }
+    }
+
+    // Cache expired or missing, fetch fresh models
+    let models = self.fetch_models().await?;
+    
+    // Update cache
+    {
+      let mut cache = self.cached_models.write();
+      *cache = Some(CachedModels {
+        models: models.clone(),
+        fetched_at: SystemTime::now(),
+      });
+    }
+
+    Ok(models)
+  }
+
+  async fn fetch_models(&self) -> Result<Vec<String>, PollinationsError> {
+    let url = "https://image.pollinations.ai/models";
+    let resp = self.http.get(url).send().await?;
+    
+    if !resp.status().is_success() {
+      return Err(PollinationsError::Api(format!(
+        "Failed to fetch models: HTTP {}",
+        resp.status()
+      )));
+    }
+
+    let models: Vec<String> = resp.json().await?;
+    Ok(models)
+  }
+
+  pub async fn generate(&self, prompt: &str, model: Option<&str>) -> Result<String, PollinationsError> {
     let trimmed = prompt.trim();
     if trimmed.is_empty() {
       return Err(PollinationsError::MissingPrompt);
@@ -53,44 +109,40 @@ impl PollinationsClient {
 
     // If API key is set, use API endpoint
     if let Some(api_key) = &self.api_key {
-      return self.generate_via_api(trimmed, api_key).await;
+      return self.generate_via_api(trimmed, api_key, model).await;
     }
 
     // Fallback to direct URL generation (no auth required)
+    // Banner ratio: 1920x640 (3:1 horizontal banner)
     let encoded = urlencoding::encode(trimmed);
     let seed = Utc::now().timestamp();
+    let model_param = model
+      .map(|m| format!("&model={}", urlencoding::encode(m)))
+      .unwrap_or_default();
     Ok(format!(
-      "https://image.pollinations.ai/prompt/{}?width=1024&height=1024&seed={}",
-      encoded, seed
+      "https://image.pollinations.ai/prompt/{}?width=1920&height=640&seed={}{}",
+      encoded, seed, model_param
     ))
   }
 
-  async fn generate_via_api(&self, prompt: &str, api_key: &str) -> Result<String, PollinationsError> {
+  async fn generate_via_api(&self, prompt: &str, api_key: &str, model: Option<&str>) -> Result<String, PollinationsError> {
     // Pollinations API uses GET requests with the prompt in the URL path
-    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024&seed={seed}
-    // According to docs, authentication can be via Bearer token or referrer
-    // The API returns the image directly, so we just need to construct the URL
+    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1920&height=640&seed={seed}&model={model}
+    // Banner ratio: 1920x640 (3:1 horizontal banner)
     let encoded = urlencoding::encode(prompt);
     let seed = Utc::now().timestamp();
+    let model_param = model
+      .map(|m| format!("&model={}", urlencoding::encode(m)))
+      .unwrap_or_default();
     
     // Build the URL with query parameters
     let url = format!(
-      "https://image.pollinations.ai/prompt/{}?width=1024&height=1024&seed={}",
-      encoded, seed
+      "https://image.pollinations.ai/prompt/{}?width=1920&height=640&seed={}{}",
+      encoded, seed, model_param
     );
     
-    // For authenticated requests, we can add the API key as a query parameter
-    // or use Bearer token in header. According to docs, Bearer token works for GET requests too.
-    // Let's try with Bearer token first, and if that fails, use the URL directly
-    // (the image will be generated and served from that URL)
-    
-    // Actually, since the image API returns the image directly (not JSON),
-    // and the URL itself is the image URL, we can just return it.
     // The API key/referrer is mainly for rate limiting and authentication tracking.
-    // We'll add the referrer as a query parameter if needed, but the URL itself works.
-    
-    // For now, just return the URL - it will work with or without auth
-    // The API key is used for rate limiting, not for URL generation
+    // The URL itself works and returns the image directly.
     Ok(url)
   }
 }

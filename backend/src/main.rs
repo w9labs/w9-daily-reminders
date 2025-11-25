@@ -10,8 +10,8 @@ mod w9mail;
 
 use axum::{routing::get, routing::post, Router};
 use routes::{
-  google_callback, google_start, health, list_mail_senders, preview, send_test_email, settings_get, settings_post, system_config_get,
-  system_config_update,
+  get_image_models, google_callback, google_start, health, list_mail_senders, preview, send_test_email, settings_get, settings_post,
+  system_config_get, system_config_update,
 };
 use std::net::SocketAddr;
 use store::DataStore;
@@ -43,6 +43,7 @@ async fn main() -> anyhow::Result<()> {
     .route("/api/reminders/send-test", post(send_test_email))
     .route("/api/system/config", get(system_config_get).post(system_config_update))
     .route("/api/system/senders", get(list_mail_senders))
+    .route("/api/system/image-models", get(get_image_models))
     .route("/api/system/health", get(health))
     .route("/api/google/start", post(google_start))
     .route("/api/google/callback", post(google_callback))

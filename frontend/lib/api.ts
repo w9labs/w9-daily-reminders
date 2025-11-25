@@ -82,6 +82,10 @@ export function sendTestEmail(recipient?: string) {
   })
 }
 
+export function getImageModels() {
+  return request<string[]>('/api/system/image-models', { method: 'GET' })
+}
+
 function getStoredToken(): string | null {
   if (typeof window === 'undefined') return null
   return localStorage.getItem('w9_token')

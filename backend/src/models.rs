@@ -14,6 +14,8 @@ pub struct ReminderSettings {
   pub weather_location: String,
   pub include_weather: bool,
   pub include_image: bool,
+  #[serde(default)]
+  pub image_model: Option<String>,
   #[serde(default = "default_summary_style")]
   pub summary_style: SummaryStyle,
 }
@@ -41,6 +43,7 @@ impl Default for ReminderSettings {
       weather_location: "Stockholm, Sweden".into(),
       include_weather: true,
       include_image: true,
+      image_model: None,
       summary_style: SummaryStyle::Concise,
     }
   }
