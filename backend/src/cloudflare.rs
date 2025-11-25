@@ -122,16 +122,16 @@ fn build_payload(model: &str, prompt: &str) -> serde_json::Value {
   match model {
     "@cf/bytedance/stable-diffusion-xl-lightning" => serde_json::json!({
       "prompt": prompt,
-      "width": 600,
-      "height": 150,
+      "width": 1024,
+      "height": 256,
       "num_steps": 8,
       "guidance": 5,
       "seed": seed,
     }),
     "@cf/black-forest-labs/flux-2-dev" | "@cf/black-forest-labs/flux-1-schnell" => serde_json::json!({
       "prompt": prompt,
-      "width": 600,
-      "height": 150,
+      "width": 1024,
+      "height": 256,
       "seed": seed,
     }),
     _ => serde_json::json!({ "prompt": prompt }),
