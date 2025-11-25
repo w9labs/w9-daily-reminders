@@ -211,8 +211,13 @@ pub async fn system_config_update(
 pub async fn get_image_models(
   State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<Vec<String>>>, ApiError> {
-  let models = state.pollinations.get_available_models().await?;
-  Ok(Json(ApiResponse { data: models }))
+  match state.pollinations.get_available_models().await {
+    Ok(models) => Ok(Json(ApiResponse { data: models })),
+    Err(err) => {
+      tracing::warn!(?err, "pollinations model fetch failed");
+      Ok(Json(ApiResponse { data: vec!["flux".into(), "turbo".into()] }))
+    }
+  }
 }
 
 pub async fn list_mail_senders(
