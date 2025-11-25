@@ -157,7 +157,7 @@ impl PollinationsClient {
 
     let referer = self.resolve_referer();
 
-    let response = self
+    let mut response = self
       .http
       .get(&url)
       .bearer_auth(api_key)
@@ -169,11 +169,13 @@ impl PollinationsClient {
       .send()
       .await?;
 
-    if !response.status().is_success() {
+    let status = response.status();
+
+    if !status.is_success() {
       let body = response.text().await.unwrap_or_default();
       return Err(PollinationsError::Api(format!(
         "Pollinations request failed ({}): {}",
-        response.status(),
+        status,
         body
       )));
     }
