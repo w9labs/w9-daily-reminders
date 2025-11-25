@@ -122,11 +122,11 @@ impl CerebrasClient {
 
     for attempt in 1..=3 {
       let response = self
-        .http
-        .post("https://api.cerebras.ai/v1/chat/completions")
-        .bearer_auth(&self.api_key)
-        .json(&req)
-        .send()
+      .http
+      .post("https://api.cerebras.ai/v1/chat/completions")
+      .bearer_auth(&self.api_key)
+      .json(&req)
+      .send()
         .await;
 
       let response = match response {
@@ -134,7 +134,10 @@ impl CerebrasClient {
         Err(e) => {
           tracing::warn!(?e, attempt, "cerebras request failed");
           last_error = CerebrasError::Request(e);
-          continue;
+          if attempt < 3 {
+            continue;
+          }
+          break;
         }
       };
 
@@ -144,14 +147,38 @@ impl CerebrasClient {
         Err(e) => {
           tracing::warn!(?e, attempt, "failed to read response text");
           last_error = CerebrasError::Request(e);
-          continue;
+          if attempt < 3 {
+            continue;
+          }
+          break;
         }
       };
 
       if !status.is_success() {
-        tracing::error!(%status, body = %resp_text, attempt, "cerebras api error");
+        let is_rate_limit = status == 429;
+        tracing::error!(%status, body = %resp_text, attempt, is_rate_limit, "cerebras api error");
         last_error = CerebrasError::Api(format!("HTTP {}: {}", status, resp_text));
-        continue;
+        
+        // For rate limit errors, don't retry - we've exceeded quota
+        if is_rate_limit {
+          tracing::warn!("rate limit exceeded, not retrying");
+          return Err(last_error);
+        }
+        
+        // For other errors, wait before retrying
+        if attempt < 3 {
+          let delay_ms = if attempt == 1 {
+            // First retry: 2-3 seconds
+            2000 + (attempt as u64 * 500)
+          } else {
+            // Second retry: 5-7 seconds
+            5000 + (attempt as u64 * 1000)
+          };
+          tracing::debug!(delay_ms, attempt, "waiting before retry");
+          tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+          continue;
+        }
+        break;
       }
 
       let resp: ChatResponse = match serde_json::from_str(&resp_text) {
@@ -159,13 +186,19 @@ impl CerebrasClient {
         Err(err) => {
           tracing::error!(body = %resp_text, error = ?err, attempt, "failed to parse Cerebras response wrapper");
           last_error = CerebrasError::Invalid("failed to parse Cerebras response".into());
-          continue;
+          if attempt < 3 {
+            continue;
+          }
+          break;
         }
       };
 
       if let Some(err) = resp.error.as_ref() {
         last_error = CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into()));
-        continue;
+        if attempt < 3 {
+          continue;
+        }
+        break;
       }
 
       let content = match resp.choices.first().and_then(|choice| {
@@ -175,7 +208,10 @@ impl CerebrasClient {
         None => {
           tracing::error!(body = %resp_text, attempt, "Cerebras response missing textual content");
           last_error = CerebrasError::Invalid("missing textual content in response".into());
-          continue;
+          if attempt < 3 {
+            continue;
+          }
+          break;
         }
       };
 
@@ -192,7 +228,10 @@ impl CerebrasClient {
              }
           }
           last_error = e;
-          continue;
+          if attempt < 3 {
+            continue;
+          }
+          break;
         }
       }
     }
@@ -297,7 +336,7 @@ fn repair_truncated_json(text: &str) -> Result<String, CerebrasError> {
   
   // Fallback: just return error if we can't easily fix it.
   Err(CerebrasError::Invalid("could not repair truncated JSON".into()))
-}
+  }
 
 fn sanitize_control_chars(input: &str) -> String {
   let mut sanitized = String::with_capacity(input.len());
