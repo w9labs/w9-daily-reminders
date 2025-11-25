@@ -230,11 +230,11 @@ fn schema_definition() -> serde_json::Value {
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "subject": { "type": "string", "minLength": 1 },
-      "preview": { "type": "string", "minLength": 1 },
-      "html_body": { "type": "string", "minLength": 1 },
-      "text_body": { "type": "string", "minLength": 1 },
-      "image_prompt": { "type": "string", "minLength": 1 }
+      "subject": { "type": "string" },
+      "preview": { "type": "string" },
+      "html_body": { "type": "string" },
+      "text_body": { "type": "string" },
+      "image_prompt": { "type": "string" }
     },
     "required": ["subject", "preview", "html_body", "text_body", "image_prompt"]
   })
