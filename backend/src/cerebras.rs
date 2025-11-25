@@ -151,11 +151,21 @@ impl CerebrasClient {
 
     // content should already be valid JSON per structured output contract
     // but guard by ensuring it's valid JSON; if not, attempt to extract
-    let validated = match serde_json::from_str::<Value>(content) {
-      Ok(_) => content.to_string(),
-      Err(_) => extract_json_from_text(content),
+    let normalized_value = match serde_json::from_str::<Value>(content) {
+      Ok(value) => value,
+      Err(_) => {
+        let sanitized = sanitize_control_chars(content);
+        let extracted = extract_json_from_text(&sanitized);
+        serde_json::from_str::<Value>(&extracted).map_err(|err| {
+          tracing::error!(error = ?err, "failed to sanitize Cerebras JSON payload");
+          CerebrasError::Invalid("failed to sanitize Cerebras response".into())
+        })?
+      }
     };
-    Ok(validated)
+    serde_json::to_string(&normalized_value).map_err(|err| {
+      tracing::error!(error = ?err, "failed to serialize normalized Cerebras payload");
+      CerebrasError::Invalid("failed to serialize Cerebras response".into())
+    })
   }
 }
 
@@ -231,6 +241,28 @@ fn extract_json_from_text(text: &str) -> String {
   // If no JSON found, return the text as-is (might be plain JSON)
   text.trim().to_string()
   }
+
+fn sanitize_control_chars(input: &str) -> String {
+  let mut needs_sanitize = false;
+  for ch in input.chars() {
+    if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+      needs_sanitize = true;
+      break;
+    }
+  }
+  if !needs_sanitize {
+    return input.to_string();
+  }
+  let mut sanitized = String::with_capacity(input.len());
+  for ch in input.chars() {
+    if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+      sanitized.push_str(&format!("\\u{:04X}", ch as u32));
+    } else {
+      sanitized.push(ch);
+    }
+  }
+  sanitized
+}
 
 fn schema_definition() -> serde_json::Value {
   json!({
