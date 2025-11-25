@@ -2,10 +2,7 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as Base64;
 use base64::Engine;
-use reqwest::{
-  header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE},
-  StatusCode,
-};
+use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -84,7 +81,8 @@ impl CloudflareAiClient {
       .headers()
       .get(CONTENT_TYPE)
       .and_then(|value| value.to_str().ok())
-      .unwrap_or("");
+      .unwrap_or("")
+      .to_string();
 
     if content_type.contains("application/json") {
       let text = response.text().await?;
@@ -98,7 +96,7 @@ impl CloudflareAiClient {
     }
 
     let bytes = response.bytes().await?;
-    let mime = if content_type.is_empty() { "image/jpeg" } else { content_type };
+    let mime = if content_type.is_empty() { "image/jpeg" } else { content_type.as_str() };
     let encoded = Base64.encode(bytes);
     Ok(format!("data:{};base64,{}", mime, encoded))
   }
