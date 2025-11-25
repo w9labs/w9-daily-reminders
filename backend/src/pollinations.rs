@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 use reqwest::header::{HeaderValue, CONTENT_TYPE, REFERER, USER_AGENT};
 use serde::Deserialize;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use thiserror::Error;
 use tracing::warn;
 
@@ -47,9 +47,12 @@ impl PollinationsClient {
     let api_key = std::env::var("POLLINATIONS_API_KEY").ok();
     let api_base = std::env::var("POLLINATIONS_API_BASE")
       .unwrap_or_else(|_| "https://enter.pollinations.ai".into());
-    
+    let http = reqwest::Client::builder()
+      .timeout(Duration::from_secs(60))
+      .build()?;
+
     Ok(Self {
-      http: reqwest::Client::new(),
+      http,
       api_key,
       api_base,
       cached_models: Arc::new(RwLock::new(None)),
@@ -58,8 +61,12 @@ impl PollinationsClient {
 
   // Fallback constructor for when initialization fails
   pub(crate) fn fallback() -> Self {
+    let http = reqwest::Client::builder()
+      .timeout(Duration::from_secs(60))
+      .build()
+      .unwrap_or_else(|_| reqwest::Client::new());
     Self {
-      http: reqwest::Client::new(),
+      http,
       api_key: None,
       api_base: "https://enter.pollinations.ai".into(),
       cached_models: Arc::new(RwLock::new(None)),
