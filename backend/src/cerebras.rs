@@ -108,52 +108,79 @@ impl CerebrasClient {
       "disable_reasoning": true
     });
 
-    let response = self
-      .http
-      .post("https://api.cerebras.ai/v1/chat/completions")
-      .bearer_auth(&self.api_key)
-      .json(&req)
-      .send()
-      .await?;
+    let mut last_error = CerebrasError::Invalid("unknown error".into());
 
-    let status = response.status();
-    let resp_text = response.text().await?;
-    if !status.is_success() {
-      tracing::error!(%status, body = %resp_text, "cerebras request failed");
-      return Err(CerebrasError::Api(format!("HTTP {}: {}", status, resp_text)));
+    for attempt in 1..=3 {
+      let response = self
+        .http
+        .post("https://api.cerebras.ai/v1/chat/completions")
+        .bearer_auth(&self.api_key)
+        .json(&req)
+        .send()
+        .await;
+
+      let response = match response {
+        Ok(r) => r,
+        Err(e) => {
+          tracing::warn!(?e, attempt, "cerebras request failed");
+          last_error = CerebrasError::Request(e);
+          continue;
+        }
+      };
+
+      let status = response.status();
+      let resp_text = match response.text().await {
+        Ok(t) => t,
+        Err(e) => {
+          tracing::warn!(?e, attempt, "failed to read response text");
+          last_error = CerebrasError::Request(e);
+          continue;
+        }
+      };
+
+      if !status.is_success() {
+        tracing::error!(%status, body = %resp_text, attempt, "cerebras api error");
+        last_error = CerebrasError::Api(format!("HTTP {}: {}", status, resp_text));
+        continue;
+      }
+
+      let resp: ChatResponse = match serde_json::from_str(&resp_text) {
+        Ok(r) => r,
+        Err(err) => {
+          tracing::error!(body = %resp_text, error = ?err, attempt, "failed to parse Cerebras response wrapper");
+          last_error = CerebrasError::Invalid("failed to parse Cerebras response".into());
+          continue;
+        }
+      };
+
+      if let Some(err) = resp.error.as_ref() {
+        last_error = CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into()));
+        continue;
+      }
+
+      let content = match resp.choices.first().and_then(|choice| {
+        choice.message.content.as_ref().or_else(|| choice.message.reasoning.as_ref())
+      }).filter(|text| !text.trim().is_empty()) {
+        Some(c) => c,
+        None => {
+          tracing::error!(body = %resp_text, attempt, "Cerebras response missing textual content");
+          last_error = CerebrasError::Invalid("missing textual content in response".into());
+          continue;
+        }
+      };
+
+      let sanitized_content = sanitize_control_chars(content);
+      match extract_json_from_text(&sanitized_content) {
+        Ok(extracted) => return Ok(extracted),
+        Err(e) => {
+          tracing::warn!(error = ?e, body = %sanitized_content, attempt, "failed to extract JSON from response");
+          last_error = e;
+          continue;
+        }
+      }
     }
 
-    let resp: ChatResponse = serde_json::from_str(&resp_text).map_err(|err| {
-      tracing::error!(body = %resp_text, error = ?err, "failed to parse Cerebras response");
-      CerebrasError::Invalid("failed to parse Cerebras response".into())
-    })?;
-
-    if let Some(err) = resp.error.as_ref() {
-      return Err(CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into())));
-    }
-
-    let content = resp
-      .choices
-      .first()
-      .and_then(|choice| {
-        // Prefer content field, fallback to reasoning if content is missing
-        choice
-          .message
-          .content
-          .as_ref()
-          .or_else(|| choice.message.reasoning.as_ref())
-      })
-      .filter(|text| !text.trim().is_empty())
-      .ok_or_else(|| {
-        tracing::error!(body = %resp_text, "Cerebras response missing textual content");
-        CerebrasError::Invalid("missing textual content in response".into())
-      })?;
-
-    // content should already be valid JSON per structured output contract
-    // but guard by ensuring it's valid JSON; if not, attempt to extract
-    let sanitized_content = sanitize_control_chars(content);
-    let extracted = extract_json_from_text(&sanitized_content)?;
-    Ok(extracted)
+    Err(last_error)
   }
 }
 
