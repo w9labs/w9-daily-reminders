@@ -77,7 +77,7 @@ fn wrap_html(
 
   let sanitized = sanitize_html_body(inner);
   let html_body = format!(
-    "<tr><td class=\"content-padding\" style=\"color:#1a1a1a;font-size:16px;line-height:1.6;padding:32px 40px;\">{}</td></tr>",
+    "<tr><td class=\"content-padding\" style=\"font-family:'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;color:#1a1a1a;font-size:16px;line-height:1.6;padding:32px 40px;\">{}</td></tr>",
     sanitized
   );
 
@@ -98,13 +98,14 @@ fn wrap_html(
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    @media screen and (max-width: 600px) {{
-      .wrapper {{ padding: 0 !important; }}
-      .container {{ width: 100% !important; border-left: none !important; border-right: none !important; }}
-      .content-padding {{ padding: 24px 20px !important; }}
-      .header-padding {{ padding: 16px 20px !important; }}
-      .mobile-hidden {{ display: none !important; }}
-    }}
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap');
+    @media screen and (max-width: 600px) {
+      .wrapper { padding: 0 !important; }
+      .container { width: 100% !important; border-left: none !important; border-right: none !important; }
+      .content-padding { padding: 24px 20px !important; }
+      .header-padding { padding: 16px 20px !important; }
+      .mobile-hidden { display: none !important; }
+    }
   </style>
 </head>
 <body style="margin:0;padding:0;background-color:#E4E1D8;font-family:'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;color:#1a1a1a;">
