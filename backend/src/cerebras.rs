@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use thiserror::Error;
 
 use crate::models::{CalendarEvent, ReminderSettings, SummaryStyle};
+use chrono_tz::Tz;
 
 #[derive(Debug, Error)]
 pub enum CerebrasError {
@@ -203,13 +204,16 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
   prompt.push_str("The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
   prompt.push_str("Image prompt guidelines: describe a wide cinematic film or painted image that mirrors the emotional tone of the upcoming schedule. Use muted colors, natural light, film grain, and contemplative mood. Blend motifs from the provided example (urban night desk, minimalist sky, hillside hut, person in tall grass, classical hands, coastal train) with the actual events to keep it fresh.\n");
   prompt.push_str("Example image prompt to emulate: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\"\n");
-  prompt.push_str("Events (ISO8601 in timezone, include location if any):\n");
+  prompt.push_str("Events (Local Time):\n");
+  let tz: Tz = settings.timezone.parse().unwrap_or(chrono_tz::UTC);
   for event in events {
+    let start = event.start.with_timezone(&tz);
+    let end = event.end.with_timezone(&tz);
     prompt.push_str(&format!(
       "- {} from {} to {} at {}\n",
       event.summary,
-      event.start,
-      event.end,
+      start.format("%Y-%m-%d %H:%M"),
+      end.format("%Y-%m-%d %H:%M"),
       event.location.as_deref().unwrap_or("N/A"),
     ));
   }

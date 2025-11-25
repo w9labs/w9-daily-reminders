@@ -7,5 +7,6 @@ export const TIMEZONES: string[] = Array.isArray(timeZonesNames) && timeZonesNam
   'America/New_York',
   'America/Los_Angeles',
   'Asia/Tokyo',
+  'Asia/Ho_Chi_Minh_City',
   'Australia/Sydney',
 ]
