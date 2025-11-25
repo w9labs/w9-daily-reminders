@@ -162,6 +162,22 @@ fn sanitize_html_body(html: &str) -> String {
     }
   }
   
+  // Remove blockquote tags which Gmail treats as quoted text (causing collapsing)
+  loop {
+    if let Some(start) = cleaned.find("<blockquote") {
+      if let Some(end) = cleaned[start..].find('>') {
+        cleaned.replace_range(start..start + end + 1, "");
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+  while let Some(pos) = cleaned.find("</blockquote>") {
+    cleaned.replace_range(pos..pos + "</blockquote>".len(), "");
+  }
+  
   // Remove hr tags (horizontal rules - structural dividers)
   while let Some(start) = cleaned.find("<hr") {
     if let Some(end) = cleaned[start..].find('>') {
