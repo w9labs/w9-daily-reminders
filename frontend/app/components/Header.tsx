@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useSession } from '../../lib/session'
 import { clearToken } from '../../lib/auth'
 
 export default function Header() {
   const { user } = useSession()
+  const router = useRouter()
 
   return (
     <header className="header">
@@ -21,16 +23,16 @@ export default function Header() {
                 Signed in as <span className="mono">{user.email}</span> · {user.role.toUpperCase()}
               </p>
               <div className="actions">
-              <button
-                type="button"
-                className="button ghost"
-                onClick={() => {
-                  clearToken()
-                  window.location.href = '/login'
-                }}
-              >
-                Sign out
-              </button>
+                <button
+                  type="button"
+                  className="button ghost"
+                  onClick={() => {
+                    clearToken()
+                    router.push('/login')
+                  }}
+                >
+                  Sign out
+                </button>
               </div>
             </>
           ) : (

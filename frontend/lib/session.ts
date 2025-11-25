@@ -53,6 +53,10 @@ export function useSession() {
 
   useEffect(() => {
     refresh()
+
+    const handleAuthChange = () => refresh()
+    window.addEventListener('w9:auth', handleAuthChange)
+    return () => window.removeEventListener('w9:auth', handleAuthChange)
   }, [refresh])
 
   const logout = useCallback(() => {
