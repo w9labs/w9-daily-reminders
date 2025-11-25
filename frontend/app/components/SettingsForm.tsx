@@ -267,7 +267,7 @@ export default function SettingsForm({ onPreview }: Props) {
             ))}
           </select>
           {loadingModels && <small>Loading available models...</small>}
-          <small>Available models change every 4 hours. Current selection: {settings.imageModel || 'flux (default)'}</small>
+          <small>Available models refresh every 5 minutes. Current selection: {settings.imageModel || 'flux (default)'}</small>
         </div>
       )}
 

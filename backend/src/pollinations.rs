@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use thiserror::Error;
 use tracing::warn;
+use serde::Deserialize;
 
 #[derive(Debug, Error)]
 pub enum PollinationsError {
@@ -90,6 +91,11 @@ impl PollinationsClient {
     Ok(models)
   }
 
+  #[derive(Deserialize)]
+  struct PollinationsModel {
+    name: String,
+  }
+
   async fn fetch_models(&self) -> Result<Vec<String>, PollinationsError> {
     let url = format!("{}/api/generate/image/models", self.api_base.trim_end_matches('/'));
     
@@ -113,8 +119,9 @@ impl PollinationsClient {
       )));
     }
 
-    let models: Vec<String> = resp.json().await?;
-    Ok(models)
+    let models: Vec<PollinationsModel> = resp.json().await?;
+    let names = models.into_iter().map(|m| m.name).collect::<Vec<_>>();
+    Ok(names)
   }
 
   pub async fn generate(&self, prompt: &str, model: Option<&str>) -> Result<String, PollinationsError> {
