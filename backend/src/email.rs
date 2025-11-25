@@ -77,7 +77,7 @@ fn wrap_html(
 
   let sanitized = sanitize_html_body(inner);
   let html_body = format!(
-    "<tr><td class=\"content-padding\" style=\"font-family:'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;color:#1a1a1a;font-size:16px;line-height:1.6;padding:32px 40px;\">{}</td></tr>",
+    "<tr><td class=\"content-padding\" style=\"font-family:'Roboto', Arial, sans-serif;color:#1a1a1a;font-size:16px;line-height:1.6;padding:32px 40px;\">{}</td></tr>",
     sanitized
   );
 
@@ -96,9 +96,9 @@ fn wrap_html(
   <title>W9 Daily Reminder</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;500;700&display=swap&subset=vietnamese" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap&subset=vietnamese');
     @media screen and (max-width: 600px) {{
       .wrapper {{ padding: 0 !important; }}
       .container {{ width: 100% !important; border-left: none !important; border-right: none !important; }}
@@ -108,7 +108,8 @@ fn wrap_html(
     }}
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:#E4E1D8;font-family:'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;color:#1a1a1a;">
+</head>
+<body style="margin:0;padding:0;background-color:#E4E1D8;font-family:'Roboto', Arial, sans-serif;color:#1a1a1a;">
   <div style="display:none;font-size:1px;color:#E4E1D8;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
     {preview_text}
   </div>
