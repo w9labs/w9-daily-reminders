@@ -39,7 +39,12 @@ impl AppState {
   pub fn new(store: DataStore, mail_client: W9MailClient, mail_api_base: String, mail_service_token_env: Option<String>) -> Self {
     let weather = Arc::new(WeatherClient::new());
     let cerebras = Arc::new(CerebrasClient::new().ok());
-    let pollinations = Arc::new(PollinationsClient::new());
+    let pollinations = Arc::new(
+      PollinationsClient::new().unwrap_or_else(|err| {
+        tracing::warn!(?err, "Pollinations client initialization failed, will use fallback URL generation");
+        PollinationsClient::fallback()
+      })
+    );
     let google = Arc::new(GoogleClient::new().ok());
     Self {
       store,
