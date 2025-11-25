@@ -89,15 +89,15 @@ impl CerebrasClient {
       "messages": [
         {
           "role": "system",
-          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The html_body must contain ONLY the event list content as simple HTML (use <p>, <ul>, <li>, <strong>, <br> tags only). Do NOT include: headers, titles, section dividers, h1-h6 tags, divs with classes, or any structural layout elements. Just the event content. The image_prompt must describe a wide cinematic film or painted image with a nostalgic, contemplative mood, referencing the current day's or week's schedule. Emphasize muted palettes, natural light, film grain, and atmospheric storytelling similar to: \"A cinematic film or painted image with a nostalgic, contemplative mood. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\" Tailor the prompt to the actual events. No explanations, no markdown, just the JSON object."
+          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The html_body must contain ONLY the event list content as simple HTML (use <p>, <ul>, <li>, <strong>, <br> tags only). Do NOT include: headers, titles, section dividers, h1-h6 tags, divs with classes, or any structural layout elements. Just the event content. The image_prompt must describe a wide cinematic film or painted image with a nostalgic, contemplative mood, referencing the current day's or week's schedule. Emphasize muted palettes, natural light, film grain, and atmospheric storytelling similar to: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\" Tailor the prompt to the actual events. No explanations, no markdown, just the JSON object."
         },
         {
           "role": "user",
           "content": instructions
         }
       ],
-      "temperature": 0.2,
-      "max_tokens": 2000,
+      "temperature": 1.0,
+      "max_tokens": 4000,
       "response_format": {
         "type": "json_schema",
         "json_schema": {
@@ -109,52 +109,86 @@ impl CerebrasClient {
       "disable_reasoning": true
     });
 
-    let response = self
-      .http
-      .post("https://api.cerebras.ai/v1/chat/completions")
-      .bearer_auth(&self.api_key)
-      .json(&req)
-      .send()
-      .await?;
+    let mut last_error = CerebrasError::Invalid("unknown error".into());
 
-    let status = response.status();
-    let resp_text = response.text().await?;
-    if !status.is_success() {
-      tracing::error!(%status, body = %resp_text, "cerebras request failed");
-      return Err(CerebrasError::Api(format!("HTTP {}: {}", status, resp_text)));
+    for attempt in 1..=3 {
+      let response = self
+        .http
+        .post("https://api.cerebras.ai/v1/chat/completions")
+        .bearer_auth(&self.api_key)
+        .json(&req)
+        .send()
+        .await;
+
+      let response = match response {
+        Ok(r) => r,
+        Err(e) => {
+          tracing::warn!(?e, attempt, "cerebras request failed");
+          last_error = CerebrasError::Request(e);
+          continue;
+        }
+      };
+
+      let status = response.status();
+      let resp_text = match response.text().await {
+        Ok(t) => t,
+        Err(e) => {
+          tracing::warn!(?e, attempt, "failed to read response text");
+          last_error = CerebrasError::Request(e);
+          continue;
+        }
+      };
+
+      if !status.is_success() {
+        tracing::error!(%status, body = %resp_text, attempt, "cerebras api error");
+        last_error = CerebrasError::Api(format!("HTTP {}: {}", status, resp_text));
+        continue;
+      }
+
+      let resp: ChatResponse = match serde_json::from_str(&resp_text) {
+        Ok(r) => r,
+        Err(err) => {
+          tracing::error!(body = %resp_text, error = ?err, attempt, "failed to parse Cerebras response wrapper");
+          last_error = CerebrasError::Invalid("failed to parse Cerebras response".into());
+          continue;
+        }
+      };
+
+      if let Some(err) = resp.error.as_ref() {
+        last_error = CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into()));
+        continue;
+      }
+
+      let content = match resp.choices.first().and_then(|choice| {
+        choice.message.content.as_ref().or_else(|| choice.message.reasoning.as_ref())
+      }).filter(|text| !text.trim().is_empty()) {
+        Some(c) => c,
+        None => {
+          tracing::error!(body = %resp_text, attempt, "Cerebras response missing textual content");
+          last_error = CerebrasError::Invalid("missing textual content in response".into());
+          continue;
+        }
+      };
+
+      let sanitized_content = sanitize_control_chars(content);
+      match extract_json_from_text(&sanitized_content) {
+        Ok(extracted) => return Ok(extracted),
+        Err(e) => {
+          tracing::warn!(error = ?e, body = %sanitized_content, attempt, "failed to extract JSON from response");
+          // Attempt to repair if it's the last attempt
+          if attempt == 3 {
+             if let Ok(repaired) = repair_truncated_json(&sanitized_content) {
+                 tracing::info!("successfully repaired truncated JSON");
+                 return Ok(repaired);
+             }
+          }
+          last_error = e;
+          continue;
+        }
+      }
     }
 
-    let resp: ChatResponse = serde_json::from_str(&resp_text).map_err(|err| {
-      tracing::error!(body = %resp_text, error = ?err, "failed to parse Cerebras response");
-      CerebrasError::Invalid("failed to parse Cerebras response".into())
-    })?;
-
-    if let Some(err) = resp.error.as_ref() {
-      return Err(CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into())));
-    }
-
-    let content = resp
-      .choices
-      .first()
-      .and_then(|choice| {
-        // Prefer content field, fallback to reasoning if content is missing
-        choice
-          .message
-          .content
-          .as_ref()
-          .or_else(|| choice.message.reasoning.as_ref())
-      })
-      .filter(|text| !text.trim().is_empty())
-      .ok_or_else(|| {
-        tracing::error!(body = %resp_text, "Cerebras response missing textual content");
-        CerebrasError::Invalid("missing textual content in response".into())
-      })?;
-
-    // content should already be valid JSON per structured output contract
-    // but guard by ensuring it's valid JSON; if not, attempt to extract
-    let sanitized_content = sanitize_control_chars(content);
-    let extracted = extract_json_from_text(&sanitized_content);
-    Ok(extracted)
+    Err(last_error)
   }
 }
 
@@ -166,7 +200,8 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
     "Summary style: {}\n",
     summary_style_label(&settings.summary_style)
   ));
-  prompt.push_str("IMPORTANT: The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
+  prompt.push_str("IMPORTANT: Output the JSON keys in this EXACT order: subject, preview, text_body, image_prompt, html_body. This is critical.\n");
+  prompt.push_str("The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
   prompt.push_str("Image prompt guidelines: describe a wide cinematic film or painted image that mirrors the emotional tone of the upcoming schedule. Use muted colors, natural light, film grain, and contemplative mood. Blend motifs from the provided example (urban night desk, minimalist sky, hillside hut, person in tall grass, classical hands, coastal train) with the actual events to keep it fresh.\n");
   prompt.push_str("Example image prompt to emulate: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\"\n");
   prompt.push_str("Events (Local Time):\n");
@@ -207,32 +242,53 @@ fn summary_style_label(style: &SummaryStyle) -> &'static str {
   }
 }
 
-fn extract_json_from_text(text: &str) -> String {
+fn extract_json_from_text(text: &str) -> Result<String, CerebrasError> {
   // Try to find JSON object in the text
   // Look for { ... } pattern
   if let Some(start) = text.find('{') {
     let mut depth = 0;
-    let mut end = start;
     for (i, ch) in text[start..].char_indices() {
       match ch {
         '{' => depth += 1,
         '}' => {
           depth -= 1;
           if depth == 0 {
-            end = start + i + 1;
-            break;
+            return Ok(text[start..=start + i].to_string());
           }
         }
         _ => {}
       }
     }
-    if depth == 0 {
-      return text[start..end].to_string();
-    }
+    // Found start but no end
+    return Err(CerebrasError::Invalid("incomplete JSON response".into()));
   }
-  // If no JSON found, return the text as-is (might be plain JSON)
-  text.trim().to_string()
+  // No JSON object found
+  Err(CerebrasError::Invalid("no JSON object found in response".into()))
+}
+
+fn repair_truncated_json(text: &str) -> Result<String, CerebrasError> {
+  // Simple repair: assume it's a JSON object that got cut off.
+  // Find the start
+  let start = text.find('{').ok_or_else(|| CerebrasError::Invalid("no JSON start found".into()))?;
+  let mut working = text[start..].to_string();
+  
+  // Try closing it with various suffixes
+  let suffixes = ["}", "\"}", "\"]}", "\"]\"}"];
+  
+  for suffix in suffixes {
+      let candidate = format!("{}{}", working, suffix);
+      if serde_json::from_str::<serde_json::Value>(&candidate).is_ok() {
+          return Ok(candidate);
+      }
   }
+  
+  // If simple suffixes fail, try to backtrack to the last valid comma or key?
+  // That's too complex. Let's just try to close the last open string if possible.
+  // If the last non-whitespace char is not '"' or '}' or ']', it might be inside a string or number.
+  
+  // Fallback: just return error if we can't easily fix it.
+  Err(CerebrasError::Invalid("could not repair truncated JSON".into()))
+}
 
 fn sanitize_control_chars(input: &str) -> String {
   let mut sanitized = String::with_capacity(input.len());
@@ -258,7 +314,9 @@ fn sanitize_control_chars(input: &str) -> String {
         '\n' => sanitized.push_str("\\n"),
         '\r' => sanitized.push_str("\\r"),
         '\t' => sanitized.push_str("\\t"),
-        c if c.is_control() => sanitized.push_str(&format!("\\u{:04X}", c as u32)),
+        c if c.is_control() => {
+          // Skip other control characters (like \u0010)
+        }
         _ => sanitized.push(ch),
       }
     } else {
