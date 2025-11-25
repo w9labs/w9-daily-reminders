@@ -246,11 +246,39 @@ fn build_barcode() -> String {
 }
 
 fn sanitize_control_chars(input: &str) -> String {
-  fn is_bad(ch: char) -> bool {
-    ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t'
+  let mut sanitized = String::with_capacity(input.len());
+  let mut in_string = false;
+  let mut escape_next = false;
+
+  for ch in input.chars() {
+    if in_string {
+      if escape_next {
+        sanitized.push(ch);
+        escape_next = false;
+        continue;
+      }
+      match ch {
+        '\\' => {
+          sanitized.push(ch);
+          escape_next = true;
+        }
+        '"' => {
+          sanitized.push(ch);
+          in_string = false;
+        }
+        '\n' => sanitized.push_str("\\n"),
+        '\r' => sanitized.push_str("\\r"),
+        '\t' => sanitized.push_str("\\t"),
+        c if c.is_control() => sanitized.push_str(&format!("\\u{:04X}", c as u32)),
+        _ => sanitized.push(ch),
+      }
+    } else {
+      sanitized.push(ch);
+      if ch == '"' {
+        in_string = true;
+      }
+    }
   }
-  if !input.chars().any(is_bad) {
-    return input.to_string();
-  }
-  input.chars().filter(|ch| !is_bad(*ch)).collect()
+
+  sanitized
 }
