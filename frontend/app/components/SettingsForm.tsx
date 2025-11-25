@@ -1,15 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { reminderSettingsSchema } from '../../lib/schemas'
 import { DEFAULT_SETTINGS, LANGUAGES, SUMMARY_STYLES } from '../../lib/constants'
 import { TIMEZONES } from '../../lib/timezones'
-import type { ReminderPreview, ReminderSettings } from '../../lib/types'
-import { getImageModels, getSettings, requestPreview, saveSettings, startGoogleAuth } from '../../lib/api'
-
-interface Props {
-  onPreview(preview: ReminderPreview): void
-}
+import type { ReminderSettings } from '../../lib/types'
+import { getImageModels, getSettings, saveSettings, startGoogleAuth } from '../../lib/api'
 
 const customOptionValue = 'custom'
 
@@ -26,7 +22,7 @@ const deriveLanguageChoice = (language: string, customLanguage?: string): {
   return { choice: 'preset' }
 }
 
-export default function SettingsForm({ onPreview }: Props) {
+export default function SettingsForm() {
   const initialLanguage = deriveLanguageChoice(DEFAULT_SETTINGS.language)
   const [settings, setSettings] = useState<ReminderSettings>({
     userEmail: '',
@@ -37,7 +33,6 @@ export default function SettingsForm({ onPreview }: Props) {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<string>('waiting for configuration')
   const [error, setError] = useState<string>('')
-  const [isPending, startTransition] = useTransition()
   const [imageModels, setImageModels] = useState<string[]>([])
   const [loadingModels, setLoadingModels] = useState(false)
 
@@ -109,19 +104,7 @@ export default function SettingsForm({ onPreview }: Props) {
         setStatus('save failed')
         return
       }
-      setStatus('configuration saved · generating preview')
-      const previewPayload = response.data ?? parse.data
-      startTransition(() =>
-        requestPreview(previewPayload).then((preview) => {
-          if (preview.ok && preview.data) {
-            onPreview(preview.data)
-            setStatus('preview refreshed')
-          } else {
-            setError(preview.error || 'preview failed')
-            setStatus('preview failed')
-          }
-        })
-      )
+      setStatus('configuration saved · visit the Preview tab to generate an email')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'unknown error')
       setStatus('exception')
@@ -293,8 +276,8 @@ export default function SettingsForm({ onPreview }: Props) {
         <button type="button" onClick={handleGoogleSync} className="button ghost" disabled={saving}>
           Sync Google Calendar
         </button>
-        <button type="submit" disabled={saving || isPending}>
-          {saving ? 'Saving…' : 'Save + Preview'}
+        <button type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save configuration'}
         </button>
       </div>
 

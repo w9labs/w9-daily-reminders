@@ -66,7 +66,7 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> Str
     .map(|url| {
       format!(
         "<div style=\"margin:0 0 24px 0;text-align:center;\"><img src=\"{}\" alt=\"Daily visual\" style=\"max-width:100%;height:auto;border:2px solid #fff;display:block;margin:0 auto;\" /></div>",
-        html_escape(url)
+        url
       )
     })
     .unwrap_or_default();
