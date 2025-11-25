@@ -96,7 +96,7 @@ impl CerebrasClient {
         }
       ],
       "temperature": 0.2,
-      "max_tokens": 2000,
+      "max_tokens": 4000,
       "response_format": {
         "type": "json_schema",
         "json_schema": {
@@ -152,7 +152,7 @@ impl CerebrasClient {
     // content should already be valid JSON per structured output contract
     // but guard by ensuring it's valid JSON; if not, attempt to extract
     let sanitized_content = sanitize_control_chars(content);
-    let extracted = extract_json_from_text(&sanitized_content);
+    let extracted = extract_json_from_text(&sanitized_content)?;
     Ok(extracted)
   }
 }
@@ -203,32 +203,29 @@ fn summary_style_label(style: &SummaryStyle) -> &'static str {
   }
 }
 
-fn extract_json_from_text(text: &str) -> String {
+fn extract_json_from_text(text: &str) -> Result<String, CerebrasError> {
   // Try to find JSON object in the text
   // Look for { ... } pattern
   if let Some(start) = text.find('{') {
     let mut depth = 0;
-    let mut end = start;
     for (i, ch) in text[start..].char_indices() {
       match ch {
         '{' => depth += 1,
         '}' => {
           depth -= 1;
           if depth == 0 {
-            end = start + i + 1;
-            break;
+            return Ok(text[start..=start + i].to_string());
           }
         }
         _ => {}
       }
     }
-    if depth == 0 {
-      return text[start..end].to_string();
-    }
+    // Found start but no end
+    return Err(CerebrasError::Invalid("incomplete JSON response".into()));
   }
-  // If no JSON found, return the text as-is (might be plain JSON)
-  text.trim().to_string()
-  }
+  // No JSON object found
+  Err(CerebrasError::Invalid("no JSON object found in response".into()))
+}
 
 fn sanitize_control_chars(input: &str) -> String {
   let mut sanitized = String::with_capacity(input.len());
@@ -254,7 +251,9 @@ fn sanitize_control_chars(input: &str) -> String {
         '\n' => sanitized.push_str("\\n"),
         '\r' => sanitized.push_str("\\r"),
         '\t' => sanitized.push_str("\\t"),
-        c if c.is_control() => sanitized.push_str(&format!("\\u{:04X}", c as u32)),
+        c if c.is_control() => {
+          // Skip other control characters (like \u0010)
+        }
         _ => sanitized.push(ch),
       }
     } else {

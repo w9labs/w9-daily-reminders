@@ -269,7 +269,9 @@ fn sanitize_control_chars(input: &str) -> String {
         '\n' => sanitized.push_str("\\n"),
         '\r' => sanitized.push_str("\\r"),
         '\t' => sanitized.push_str("\\t"),
-        c if c.is_control() => sanitized.push_str(&format!("\\u{:04X}", c as u32)),
+        c if c.is_control() => {
+          // Skip other control characters
+        }
         _ => sanitized.push(ch),
       }
     } else {
