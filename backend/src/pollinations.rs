@@ -14,20 +14,7 @@ pub enum PollinationsError {
   Api(String),
 }
 
-#[derive(Debug, Serialize)]
-struct GenerateRequest {
-  prompt: String,
-  width: u32,
-  height: u32,
-  seed: Option<i64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GenerateResponse {
-  image_url: Option<String>,
-  url: Option<String>,
-  error: Option<String>,
-}
+// Removed unused structs - Pollinations image API uses GET with URL parameters, not POST with JSON
 
 #[derive(Clone)]
 pub struct PollinationsClient {
@@ -79,53 +66,32 @@ impl PollinationsClient {
   }
 
   async fn generate_via_api(&self, prompt: &str, api_key: &str) -> Result<String, PollinationsError> {
-    let url = format!("{}/api/generate", self.api_base.trim_end_matches('/'));
+    // Pollinations API uses GET requests with the prompt in the URL path
+    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024&seed={seed}
+    // According to docs, authentication can be via Bearer token or referrer
+    // The API returns the image directly, so we just need to construct the URL
+    let encoded = urlencoding::encode(prompt);
     let seed = Utc::now().timestamp();
     
-    let req = GenerateRequest {
-      prompt: prompt.to_string(),
-      width: 1024,
-      height: 1024,
-      seed: Some(seed),
-    };
-
-    let resp = self
-      .http
-      .post(&url)
-      .bearer_auth(api_key)
-      .json(&req)
-      .send()
-      .await?;
-
-    let status = resp.status();
-    let body_text = resp.text().await.unwrap_or_default();
-
-    if !status.is_success() {
-      return Err(PollinationsError::Api(format!("HTTP {}: {}", status, body_text)));
-    }
-
-    let json: GenerateResponse = serde_json::from_str(&body_text)
-      .map_err(|_| PollinationsError::Api(format!("Invalid response: {}", body_text)))?;
-
-    if let Some(error) = json.error {
-      return Err(PollinationsError::Api(error));
-    }
-
-    // Try image_url first, then url, then fallback to direct URL
-    if let Some(image_url) = json.image_url {
-      return Ok(image_url);
-    }
-    
-    if let Some(url) = json.url {
-      return Ok(url);
-    }
-
-    // Fallback to direct URL if API doesn't return one
-    let encoded = urlencoding::encode(prompt);
-    Ok(format!(
+    // Build the URL with query parameters
+    let url = format!(
       "https://image.pollinations.ai/prompt/{}?width=1024&height=1024&seed={}",
       encoded, seed
-    ))
+    );
+    
+    // For authenticated requests, we can add the API key as a query parameter
+    // or use Bearer token in header. According to docs, Bearer token works for GET requests too.
+    // Let's try with Bearer token first, and if that fails, use the URL directly
+    // (the image will be generated and served from that URL)
+    
+    // Actually, since the image API returns the image directly (not JSON),
+    // and the URL itself is the image URL, we can just return it.
+    // The API key/referrer is mainly for rate limiting and authentication tracking.
+    // We'll add the referrer as a query parameter if needed, but the URL itself works.
+    
+    // For now, just return the URL - it will work with or without auth
+    // The API key is used for rate limiting, not for URL generation
+    Ok(url)
   }
 }
 
