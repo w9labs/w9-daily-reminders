@@ -63,29 +63,38 @@ struct ApiErrorPayload {
 pub struct CerebrasClient {
   http: reqwest::Client,
   api_key: String,
-  model: String,
 }
 
 impl CerebrasClient {
   pub fn new() -> Result<Self, CerebrasError> {
     let api_key = std::env::var("CEREBRAS_API_KEY").map_err(|_| CerebrasError::MissingKey)?;
-    let model = std::env::var("CEREBRAS_MODEL").unwrap_or_else(|_| "zai-glm-4.6".into());
     Ok(Self {
       http: reqwest::Client::new(),
       api_key,
-      model,
     })
+  }
+
+  pub fn supported_models() -> Vec<String> {
+    vec![
+      "gpt-oss-120b".to_string(),
+      "llama-3.3-70b".to_string(),
+      "llama3.1-8b".to_string(),
+      "qwen-3-235b-a22b-instruct-2507".to_string(),
+      "qwen-3-32b".to_string(),
+      "zai-glm-4.6".to_string(),
+    ]
   }
 
   pub async fn generate_email(
     &self,
+    model: &str,
     settings: &ReminderSettings,
     events: &[CalendarEvent],
     weather: Option<&str>,
   ) -> Result<String, CerebrasError> {
     let instructions = build_prompt(settings, events, weather);
     let req = serde_json::json!({
-      "model": self.model,
+      "model": model,
       "messages": [
         {
           "role": "system",

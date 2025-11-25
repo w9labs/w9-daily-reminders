@@ -223,8 +223,13 @@ pub async fn get_image_models(
 ) -> Result<Json<ApiResponse<ImageModelOptions>>, ApiError> {
   let pollinations = state.pollinations.get_available_models().await?;
   let cloudflare = CloudflareAiClient::supported_models();
+  let cerebras = if state.cerebras.is_some() {
+    crate::cerebras::CerebrasClient::supported_models()
+  } else {
+    vec![]
+  };
   Ok(Json(ApiResponse {
-    data: ImageModelOptions { pollinations, cloudflare },
+    data: ImageModelOptions { pollinations, cloudflare, cerebras },
   }))
 }
 
@@ -357,7 +362,8 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
   };
 
   let cerebras = state.cerebras.as_ref().as_ref().ok_or(ApiError::Unavailable("Cerebras API key missing"))?;
-  let raw = cerebras.generate_email(&payload, &events, weather_note.as_deref()).await?;
+  let model = payload.cerebras_model.as_deref().unwrap_or("zai-glm-4.6");
+  let raw = cerebras.generate_email(model, &payload, &events, weather_note.as_deref()).await?;
 
   let mut image_url = None;
   if payload.include_image {

@@ -20,6 +20,8 @@ pub struct ReminderSettings {
   pub image_model: Option<String>,
   #[serde(default)]
   pub cloudflare_model: Option<String>,
+  #[serde(default)]
+  pub cerebras_model: Option<String>,
   #[serde(default = "default_summary_style")]
   pub summary_style: SummaryStyle,
 }
@@ -61,6 +63,7 @@ impl Default for ReminderSettings {
       image_provider: ImageProvider::Pollinations,
       image_model: None,
       cloudflare_model: None,
+      cerebras_model: None,
       summary_style: SummaryStyle::Concise,
     }
   }
@@ -82,6 +85,7 @@ pub struct ReminderPreview {
 pub struct ImageModelOptions {
   pub pollinations: Vec<String>,
   pub cloudflare: Vec<String>,
+  pub cerebras: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

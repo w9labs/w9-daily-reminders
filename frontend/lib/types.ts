@@ -20,6 +20,7 @@ export interface ReminderSettings {
   imageProvider: ImageProvider
   imageModel?: string
   cloudflareModel?: string
+  cerebrasModel?: string
   summaryStyle: 'concise' | 'detailed' | 'bullet'
 }
 
@@ -48,4 +49,5 @@ export interface ApiResponse<T> {
 export interface ImageModelOptions {
   pollinations: string[]
   cloudflare: string[]
+  cerebras: string[]
 }

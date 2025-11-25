@@ -33,7 +33,7 @@ export default function SettingsForm() {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<string>('waiting for configuration')
   const [error, setError] = useState<string>('')
-  const [imageModels, setImageModels] = useState<ImageModelOptions>({ pollinations: [], cloudflare: [] })
+  const [imageModels, setImageModels] = useState<ImageModelOptions>({ pollinations: [], cloudflare: [], cerebras: [] })
   const [loadingModels, setLoadingModels] = useState(false)
 
   useEffect(() => {
@@ -315,6 +315,24 @@ export default function SettingsForm() {
           )}
         </>
       )}
+
+      <div className="row">
+        <label htmlFor="cerebrasModel">Cerebras AI model</label>
+        <select
+          id="cerebrasModel"
+          value={settings.cerebrasModel || 'zai-glm-4.6'}
+          onChange={(event) => update('cerebrasModel', event.target.value || undefined)}
+        >
+          {imageModels.cerebras.length === 0 && <option value="zai-glm-4.6">zai-glm-4.6 (default)</option>}
+          {imageModels.cerebras.map((model) => (
+            <option key={model} value={model}>
+              {model}
+            </option>
+          ))}
+        </select>
+        {loadingModels && <small>Loading available models…</small>}
+        <small>Select the Cerebras AI model for generating email content.</small>
+      </div>
 
       <div className="row">
         <label>Summary voice</label>
