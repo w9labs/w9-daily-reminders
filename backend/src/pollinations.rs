@@ -40,7 +40,7 @@ impl PollinationsClient {
   pub fn new() -> Result<Self, PollinationsError> {
     let api_key = std::env::var("POLLINATIONS_API_KEY").ok();
     let api_base = std::env::var("POLLINATIONS_API_BASE")
-      .unwrap_or_else(|_| "https://api.pollinations.ai".into());
+      .unwrap_or_else(|_| "https://enter.pollinations.ai".into());
     
     Ok(Self {
       http: reqwest::Client::new(),
@@ -55,14 +55,14 @@ impl PollinationsClient {
     Self {
       http: reqwest::Client::new(),
       api_key: None,
-      api_base: "https://api.pollinations.ai".into(),
+      api_base: "https://enter.pollinations.ai".into(),
       cached_models: Arc::new(RwLock::new(None)),
     }
   }
 
   pub async fn get_available_models(&self) -> Result<Vec<String>, PollinationsError> {
     // Check cache first (4 hours = 14400 seconds)
-    const CACHE_DURATION_SECS: u64 = 4 * 60 * 60;
+    const CACHE_DURATION_SECS: u64 = 5 * 60;
     
     {
       let cache = self.cached_models.read();
@@ -91,7 +91,7 @@ impl PollinationsClient {
   }
 
   async fn fetch_models(&self) -> Result<Vec<String>, PollinationsError> {
-    let url = "https://image.pollinations.ai/models";
+    let url = format!("{}/api/generate/image/models", self.api_base.trim_end_matches('/'));
     
     // If API key is available, add it as Bearer token for authenticated requests
     let mut request = self.http.get(url);
@@ -134,18 +134,15 @@ impl PollinationsClient {
   }
 
   async fn generate_via_api(&self, prompt: &str, api_key: &str, model: Option<&str>) -> Result<String, PollinationsError> {
-    // Pollinations API uses GET requests with the prompt in the URL path
-    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1024&height=341&seed={seed}&model={model}
-    // Banner ratio: 1024x341 (3:1 horizontal banner, max 1024)
-    let encoded = urlencoding::encode(prompt);
+    // enter.pollinations.ai endpoint: /api/generate/image/{prompt}?model=flux&width=...
+    let encoded_prompt = urlencoding::encode(prompt);
     let seed = Utc::now().timestamp();
-    let model_param = model
-      .map(|m| format!("&model={}", urlencoding::encode(m)))
-      .unwrap_or_default();
-    
+    let model_name = model.unwrap_or("flux");
+
     let url = format!(
-      "https://image.pollinations.ai/prompt/{}?width=1024&height=341&seed={}{}",
-      encoded, seed, model_param
+      "{}/api/generate/image/{}",
+      self.api_base.trim_end_matches('/'),
+      encoded_prompt
     );
 
     let referer = self.resolve_referer();
@@ -153,6 +150,16 @@ impl PollinationsClient {
     let response = self
       .http
       .get(&url)
+      .query(&[
+        ("model", model_name),
+        ("width", "1024"),
+        ("height", "341"),
+        ("seed", &seed.to_string()),
+        ("quality", "medium"),
+        ("safe", "false"),
+        ("nologo", "true"),
+        ("transparent", "false"),
+      ])
       .bearer_auth(api_key)
       .header(
         REFERER,
@@ -170,7 +177,7 @@ impl PollinationsClient {
         warn!(
           %status,
           %body,
-          "pollinations returned server error, falling back to public image url"
+          "pollinations enter API server error, falling back to public image url"
         );
         return Ok(self.build_public_url(prompt, model));
       }
