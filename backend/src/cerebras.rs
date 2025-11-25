@@ -95,7 +95,7 @@ impl CerebrasClient {
           "content": instructions
         }
       ],
-      "temperature": 0.2,
+      "temperature": 1.0,
       "max_tokens": 4000,
       "response_format": {
         "type": "json_schema",
@@ -174,6 +174,13 @@ impl CerebrasClient {
         Ok(extracted) => return Ok(extracted),
         Err(e) => {
           tracing::warn!(error = ?e, body = %sanitized_content, attempt, "failed to extract JSON from response");
+          // Attempt to repair if it's the last attempt
+          if attempt == 3 {
+             if let Ok(repaired) = repair_truncated_json(&sanitized_content) {
+                 tracing::info!("successfully repaired truncated JSON");
+                 return Ok(repaired);
+             }
+          }
           last_error = e;
           continue;
         }
@@ -192,7 +199,8 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
     "Summary style: {}\n",
     summary_style_label(&settings.summary_style)
   ));
-  prompt.push_str("IMPORTANT: The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
+  prompt.push_str("IMPORTANT: Output the JSON keys in this EXACT order: subject, preview, text_body, image_prompt, html_body. This is critical.\n");
+  prompt.push_str("The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
   prompt.push_str("Image prompt guidelines: describe a wide cinematic film or painted image that mirrors the emotional tone of the upcoming schedule. Use muted colors, natural light, film grain, and contemplative mood. Blend motifs from the provided example (urban night desk, minimalist sky, hillside hut, person in tall grass, classical hands, coastal train) with the actual events to keep it fresh.\n");
   prompt.push_str("Example image prompt to emulate: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\"\n");
   prompt.push_str("Events (ISO8601 in timezone, include location if any):\n");
@@ -252,6 +260,30 @@ fn extract_json_from_text(text: &str) -> Result<String, CerebrasError> {
   }
   // No JSON object found
   Err(CerebrasError::Invalid("no JSON object found in response".into()))
+}
+
+fn repair_truncated_json(text: &str) -> Result<String, CerebrasError> {
+  // Simple repair: assume it's a JSON object that got cut off.
+  // Find the start
+  let start = text.find('{').ok_or_else(|| CerebrasError::Invalid("no JSON start found".into()))?;
+  let mut working = text[start..].to_string();
+  
+  // Try closing it with various suffixes
+  let suffixes = ["}", "\"}", "\"]}", "\"]\"}"];
+  
+  for suffix in suffixes {
+      let candidate = format!("{}{}", working, suffix);
+      if serde_json::from_str::<serde_json::Value>(&candidate).is_ok() {
+          return Ok(candidate);
+      }
+  }
+  
+  // If simple suffixes fail, try to backtrack to the last valid comma or key?
+  // That's too complex. Let's just try to close the last open string if possible.
+  // If the last non-whitespace char is not '"' or '}' or ']', it might be inside a string or number.
+  
+  // Fallback: just return error if we can't easily fix it.
+  Err(CerebrasError::Invalid("could not repair truncated JSON".into()))
 }
 
 fn sanitize_control_chars(input: &str) -> String {
