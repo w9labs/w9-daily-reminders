@@ -3,11 +3,11 @@ use base64::Engine;
 use chrono::Utc;
 use parking_lot::RwLock;
 use reqwest::header::{HeaderValue, CONTENT_TYPE, REFERER, USER_AGENT};
+use serde::Deserialize;
 use std::sync::Arc;
 use std::time::SystemTime;
 use thiserror::Error;
 use tracing::warn;
-use serde::Deserialize;
 
 #[derive(Debug, Error)]
 pub enum PollinationsError {
@@ -27,6 +27,11 @@ pub enum PollinationsError {
 struct CachedModels {
   models: Vec<String>,
   fetched_at: SystemTime,
+}
+
+#[derive(Debug, Deserialize)]
+struct PollinationsModel {
+  name: String,
 }
 
 #[derive(Clone)]
@@ -89,11 +94,6 @@ impl PollinationsClient {
     }
 
     Ok(models)
-  }
-
-  #[derive(Deserialize)]
-  struct PollinationsModel {
-    name: String,
   }
 
   async fn fetch_models(&self) -> Result<Vec<String>, PollinationsError> {
