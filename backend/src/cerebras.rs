@@ -108,16 +108,20 @@ impl CerebrasClient {
       "disable_reasoning": true
     });
 
-    let resp_text = self
+    let response = self
       .http
       .post("https://api.cerebras.ai/v1/chat/completions")
       .bearer_auth(&self.api_key)
       .json(&req)
       .send()
-      .await?
-      .error_for_status()? 
-      .text()
       .await?;
+
+    let status = response.status();
+    let resp_text = response.text().await?;
+    if !status.is_success() {
+      tracing::error!(%status, body = %resp_text, "cerebras request failed");
+      return Err(CerebrasError::Api(format!("HTTP {}: {}", status, resp_text)));
+    }
 
     let resp: ChatResponse = serde_json::from_str(&resp_text).map_err(|err| {
       tracing::error!(body = %resp_text, error = ?err, "failed to parse Cerebras response");
