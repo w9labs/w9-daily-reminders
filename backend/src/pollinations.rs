@@ -88,7 +88,14 @@ impl PollinationsClient {
 
   async fn fetch_models(&self) -> Result<Vec<String>, PollinationsError> {
     let url = "https://image.pollinations.ai/models";
-    let resp = self.http.get(url).send().await?;
+    
+    // If API key is available, add it as Bearer token for authenticated requests
+    let mut request = self.http.get(url);
+    if let Some(api_key) = &self.api_key {
+      request = request.bearer_auth(api_key);
+    }
+    
+    let resp = request.send().await?;
     
     if !resp.status().is_success() {
       return Err(PollinationsError::Api(format!(
@@ -127,22 +134,24 @@ impl PollinationsClient {
 
   async fn generate_via_api(&self, prompt: &str, api_key: &str, model: Option<&str>) -> Result<String, PollinationsError> {
     // Pollinations API uses GET requests with the prompt in the URL path
-    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1920&height=640&seed={seed}&model={model}
+    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1920&height=640&seed={seed}&model={model}&token={token}
     // Banner ratio: 1920x640 (3:1 horizontal banner)
+    // Authentication: Add token as query parameter for API access
     let encoded = urlencoding::encode(prompt);
     let seed = Utc::now().timestamp();
     let model_param = model
       .map(|m| format!("&model={}", urlencoding::encode(m)))
       .unwrap_or_default();
+    let token_param = format!("&token={}", urlencoding::encode(api_key));
     
-    // Build the URL with query parameters
+    // Build the URL with query parameters including authentication token
     let url = format!(
-      "https://image.pollinations.ai/prompt/{}?width=1920&height=640&seed={}{}",
-      encoded, seed, model_param
+      "https://image.pollinations.ai/prompt/{}?width=1920&height=640&seed={}{}{}",
+      encoded, seed, model_param, token_param
     );
     
-    // The API key/referrer is mainly for rate limiting and authentication tracking.
-    // The URL itself works and returns the image directly.
+    // The API token is required for accessing premium models like gptimage
+    // The URL itself works and returns the image directly when authenticated
     Ok(url)
   }
 }
