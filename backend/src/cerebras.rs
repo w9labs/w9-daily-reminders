@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use thiserror::Error;
 
 use crate::models::{CalendarEvent, ReminderSettings, SummaryStyle};
@@ -87,7 +88,7 @@ impl CerebrasClient {
       "messages": [
         {
           "role": "system",
-          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The html_body must contain ONLY the event list content as simple HTML (use <p>, <ul>, <li>, <strong>, <br> tags only). Do NOT include: headers, titles, section dividers, h1-h6 tags, divs with classes, or any structural layout elements. Just the event content. The image_prompt should describe a random view with cozy feelings (e.g., a warm coffee shop, a peaceful reading nook, a serene landscape, a comfortable workspace). No explanations, no markdown, just the JSON object."
+          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The html_body must contain ONLY the event list content as simple HTML (use <p>, <ul>, <li>, <strong>, <br> tags only). Do NOT include: headers, titles, section dividers, h1-h6 tags, divs with classes, or any structural layout elements. Just the event content. The image_prompt must describe a wide cinematic film or painted image with a nostalgic, contemplative mood, referencing the current day's or week's schedule. Emphasize muted palettes, natural light, film grain, and atmospheric storytelling similar to: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\" Tailor the prompt to the actual events. No explanations, no markdown, just the JSON object."
         },
         {
           "role": "user",
@@ -97,7 +98,12 @@ impl CerebrasClient {
       "temperature": 0.2,
       "max_tokens": 2000,
       "response_format": {
-        "type": "json_object"
+        "type": "json_schema",
+        "json_schema": {
+          "name": "w9_daily_reminder",
+          "strict": true,
+          "schema": schema_definition()
+        }
       },
       "disable_reasoning": true
     });
@@ -151,6 +157,8 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
     summary_style_label(&settings.summary_style)
   ));
   prompt.push_str("IMPORTANT: The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
+  prompt.push_str("Image prompt guidelines: describe a wide cinematic film or painted image that mirrors the emotional tone of the upcoming schedule. Use muted colors, natural light, film grain, and contemplative mood. Blend motifs from the provided example (urban night desk, minimalist sky, hillside hut, person in tall grass, classical hands, coastal train) with the actual events to keep it fresh.\n");
+  prompt.push_str("Example image prompt to emulate: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\"\n");
   prompt.push_str("Events (ISO8601 in timezone, include location if any):\n");
   for event in events {
     prompt.push_str(&format!(
@@ -211,4 +219,19 @@ fn extract_json_from_text(text: &str) -> String {
   }
   // If no JSON found, return the text as-is (might be plain JSON)
   text.trim().to_string()
+}
+
+fn schema_definition() -> serde_json::Value {
+  json!({
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "subject": { "type": "string", "minLength": 1 },
+      "preview": { "type": "string", "minLength": 1 },
+      "html_body": { "type": "string", "minLength": 1 },
+      "text_body": { "type": "string", "minLength": 1 },
+      "image_prompt": { "type": "string", "minLength": 1 }
+    },
+    "required": ["subject", "preview", "html_body", "text_body", "image_prompt"]
+  })
 }

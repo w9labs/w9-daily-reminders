@@ -24,8 +24,6 @@ use crate::{
   w9mail::{SendEmailPayload, W9MailClient, W9MailError, W9MailProfile},
 };
 
-const STATIC_IMAGE_PROMPT: &str = "A series of cinematic film photographs and painted images with a nostalgic, contemplative mood. The collection includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.";
-
 #[derive(Clone)]
 pub struct AppState {
   store: DataStore,
@@ -357,21 +355,22 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
 
   let mut image_url = None;
   if payload.include_image {
-    let prompt = STATIC_IMAGE_PROMPT;
-    match payload.image_provider {
-      ImageProvider::Pollinations => match state.pollinations.generate(prompt, payload.image_model.as_deref()).await {
-        Ok(url) => image_url = Some(url),
-        Err(err) => tracing::warn!(?err, "pollinations generation failed"),
-      },
-      ImageProvider::Cloudflare => {
-        let client = state
-          .cloudflare
-          .as_ref()
-          .as_ref()
-          .ok_or(ApiError::Unavailable("Cloudflare Workers AI not configured"))?;
-        match client.generate(prompt, payload.cloudflare_model.as_deref()).await {
+    if let Ok(prompt) = extract_image_prompt(&raw) {
+      match payload.image_provider {
+        ImageProvider::Pollinations => match state.pollinations.generate(&prompt, payload.image_model.as_deref()).await {
           Ok(url) => image_url = Some(url),
-          Err(err) => tracing::warn!(?err, "cloudflare image generation failed"),
+          Err(err) => tracing::warn!(?err, "pollinations generation failed"),
+        },
+        ImageProvider::Cloudflare => {
+          let client = state
+            .cloudflare
+            .as_ref()
+            .as_ref()
+            .ok_or(ApiError::Unavailable("Cloudflare Workers AI not configured"))?;
+          match client.generate(&prompt, payload.cloudflare_model.as_deref()).await {
+            Ok(url) => image_url = Some(url),
+            Err(err) => tracing::warn!(?err, "cloudflare image generation failed"),
+          }
         }
       }
     }
@@ -379,6 +378,18 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
 
   let preview = build_preview(&payload, &raw, weather_note.clone(), image_url)?;
   Ok(preview)
+}
+
+fn extract_image_prompt(raw: &str) -> Result<String, ApiError> {
+  #[derive(Deserialize)]
+  struct Helper {
+    image_prompt: Option<String>,
+  }
+  let helper: Helper = serde_json::from_str(raw)?;
+  helper
+    .image_prompt
+    .filter(|s| !s.trim().is_empty())
+    .ok_or_else(|| ApiError::Unavailable("image prompt missing from Cerebras payload"))
 }
 
 #[derive(Debug)]
