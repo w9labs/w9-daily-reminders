@@ -157,7 +157,7 @@ impl PollinationsClient {
 
     let referer = self.resolve_referer();
 
-    let mut response = self
+    let response = self
       .http
       .get(&url)
       .bearer_auth(api_key)
@@ -184,7 +184,8 @@ impl PollinationsClient {
       .headers()
       .get(CONTENT_TYPE)
       .and_then(|value| value.to_str().ok())
-      .unwrap_or("image/jpeg");
+      .unwrap_or("image/jpeg")
+      .to_string();
     let bytes = response.bytes().await?;
     let encoded = Base64.encode(bytes);
     Ok(format!("data:{};base64,{}", mime, encoded))
