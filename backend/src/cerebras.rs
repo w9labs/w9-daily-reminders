@@ -93,7 +93,9 @@ impl CerebrasClient {
     weather: Option<&str>,
   ) -> Result<String, CerebrasError> {
     let instructions = build_prompt(settings, events, weather);
-    let req = serde_json::json!({
+    
+    // Build base request
+    let mut req = serde_json::json!({
       "model": model,
       "messages": [
         {
@@ -114,9 +116,28 @@ impl CerebrasClient {
           "strict": true,
           "schema": schema_definition()
         }
-      },
-      "disable_reasoning": true
+      }
     });
+    
+    // Add model-specific reasoning parameters
+    match model {
+      // Models that use reasoning_effort instead of disable_reasoning
+      "gpt-oss-120b" => {
+        req["reasoning_effort"] = serde_json::json!("low");
+      },
+      // Models that support disable_reasoning
+      "zai-glm-4.6" => {
+        req["disable_reasoning"] = serde_json::json!(true);
+      },
+      // All other models don't support disable_reasoning
+      // qwen-3-235b-a22b-instruct-2507: non-thinking only
+      // llama-3.3-70b: doesn't support disable_reasoning
+      // llama3.1-8b: doesn't support disable_reasoning
+      // qwen-3-32b: hybrid model, doesn't support disable_reasoning
+      _ => {
+        // Don't include reasoning parameters for these models
+      }
+    }
 
     let mut last_error = CerebrasError::Invalid("unknown error".into());
 
