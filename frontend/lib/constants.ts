@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: Omit<ReminderSettings, 'userEmail'> = {
   includeWeather: true,
   includeImage: true,
   imageProvider: 'pollinations',
-  cloudflareModel: '@cf/black-forest-labs/flux-1-schnell',
+  cloudflareModel: '@cf/black-forest-labs/flux-2-dev',
   summaryStyle: 'concise',
 }
 

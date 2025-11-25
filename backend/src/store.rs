@@ -1,4 +1,4 @@
-use crate::models::{GoogleTokens, HealthStatus, ReminderSettings, SystemConfig};
+use crate::models::{CachedPreview, GoogleTokens, HealthStatus, ReminderPreview, ReminderSettings, SystemConfig};
 use parking_lot::RwLock;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{path::PathBuf, sync::Arc};
@@ -8,6 +8,7 @@ const SETTINGS_FILE: &str = "settings.json";
 const HEALTH_FILE: &str = "health.json";
 const GOOGLE_TOKENS_FILE: &str = "google_tokens.json";
 const CONFIG_FILE: &str = "config.json";
+const PREVIEW_FILE: &str = "preview.json";
 
 #[derive(Clone)]
 pub struct DataStore {
@@ -16,6 +17,7 @@ pub struct DataStore {
   cache_health: Arc<RwLock<HealthStatus>>, 
   cache_tokens: Arc<RwLock<Option<GoogleTokens>>>, 
   cache_config: Arc<RwLock<SystemConfig>>, 
+  cache_preview: Arc<RwLock<Option<CachedPreview>>>,
 }
 
 #[derive(Debug, Error)]
@@ -35,6 +37,7 @@ impl DataStore {
     let mut health: HealthStatus = read_or_default(root.join(HEALTH_FILE)).await?;
     let tokens: Option<GoogleTokens> = read_optional(root.join(GOOGLE_TOKENS_FILE)).await?;
     let config: SystemConfig = read_or_default(root.join(CONFIG_FILE)).await?;
+    let preview: Option<CachedPreview> = read_optional(root.join(PREVIEW_FILE)).await.unwrap_or(None);
     if tokens.is_some() && !health.google_connected {
       health.google_connected = true;
       write_json(root.join(HEALTH_FILE), &health).await?;
@@ -46,6 +49,7 @@ impl DataStore {
       cache_health: Arc::new(RwLock::new(health)),
       cache_tokens: Arc::new(RwLock::new(tokens)),
       cache_config: Arc::new(RwLock::new(config)),
+      cache_preview: Arc::new(RwLock::new(preview)),
     })
   }
 
@@ -102,6 +106,18 @@ impl DataStore {
       *guard = data.clone();
     }
     write_json(self.root.join(CONFIG_FILE), data).await
+  }
+
+  pub fn read_preview(&self) -> Option<CachedPreview> {
+    self.cache_preview.read().clone()
+  }
+
+  pub async fn write_preview(&self, data: &CachedPreview) -> Result<(), StoreError> {
+    {
+      let mut guard = self.cache_preview.write();
+      *guard = Some(data.clone());
+    }
+    write_json(self.root.join(PREVIEW_FILE), data).await
   }
 }
 

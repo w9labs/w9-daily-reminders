@@ -2,11 +2,16 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as Base64;
 use base64::Engine;
+use chrono::Utc;
 use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::Deserialize;
 use thiserror::Error;
 
-static CLOUDFLARE_MODELS: &[&str] = &["@cf/black-forest-labs/flux-1-schnell", "@cf/bytedance/stable-diffusion-xl-lightning"];
+static CLOUDFLARE_MODELS: &[&str] = &[
+  "@cf/black-forest-labs/flux-2-dev",
+  "@cf/black-forest-labs/flux-1-schnell",
+  "@cf/bytedance/stable-diffusion-xl-lightning",
+];
 
 #[derive(Debug, Error)]
 pub enum CloudflareAiError {
@@ -63,7 +68,7 @@ impl CloudflareAiClient {
       model_name
     );
 
-    let body = serde_json::json!({ "prompt": prompt });
+    let body = build_payload(model_name, prompt);
 
     let mut request = self.http.post(&url).json(&body);
     let mut token_header = HeaderValue::from_str(&format!("Bearer {}", self.api_token)).map_err(|err| CloudflareAiError::Api(err.to_string()))?;
@@ -110,5 +115,26 @@ struct CloudflareJsonResponse {
 #[derive(Debug, Deserialize)]
 struct CloudflareResult {
   image: Option<String>,
+}
+
+fn build_payload(model: &str, prompt: &str) -> serde_json::Value {
+  let seed = Utc::now().timestamp();
+  match model {
+    "@cf/bytedance/stable-diffusion-xl-lightning" => serde_json::json!({
+      "prompt": prompt,
+      "width": 600,
+      "height": 150,
+      "num_steps": 8,
+      "guidance": 5,
+      "seed": seed,
+    }),
+    "@cf/black-forest-labs/flux-2-dev" | "@cf/black-forest-labs/flux-1-schnell" => serde_json::json!({
+      "prompt": prompt,
+      "width": 600,
+      "height": 150,
+      "seed": seed,
+    }),
+    _ => serde_json::json!({ "prompt": prompt }),
+  }
 }
 

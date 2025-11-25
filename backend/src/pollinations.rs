@@ -159,8 +159,8 @@ impl PollinationsClient {
       .get(&url)
       .query(&[
         ("model", model_name),
-        ("width", "1536"),
-        ("height", "1024"),
+        ("width", "600"),
+        ("height", "150"),
         ("seed", &seed.to_string()),
         ("quality", "medium"),
         ("safe", "false"),

@@ -1,4 +1,6 @@
 use crate::models::{ReminderPreview, ReminderSettings};
+use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -29,7 +31,7 @@ pub fn build_preview(
     EmailBuildError::InvalidPayload(format!("{} · raw: {}", err, cerebras_payload))
   })?;
 
-  let html = wrap_html(&parsed.html_body, weather_advisory.as_deref(), image_url.as_deref());
+  let html = wrap_html(&parsed.html_body, weather_advisory.as_deref(), image_url.as_deref(), settings);
   let text = wrap_text(&parsed.text_body, weather_advisory.as_deref());
 
   Ok(ReminderPreview {
@@ -51,34 +53,32 @@ fn html_escape(input: &str) -> String {
     .replace('\'', "&#x27;")
 }
 
-fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> String {
-  let weather_block = weather
-    .map(|w| {
-      let escaped = html_escape(w);
-      format!(
-        "<div style=\"border:2px dashed #fff;padding:12px;margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#fff;\">{}</div>",
-        escaped
-      )
-    })
-    .unwrap_or_default();
-  
+fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>, settings: &ReminderSettings) -> String {
+  let (day_label, date_label) = resolve_temporal_labels(&settings.timezone);
+  let header_icons = build_header_icons();
+
   let image_block = image_url
     .map(|url| {
       format!(
-        "<div style=\"margin:0 0 24px 0;text-align:center;\"><img src=\"{}\" alt=\"Daily visual\" style=\"max-width:100%;height:auto;border:2px solid #fff;display:block;margin:0 auto;\" /></div>",
+        "<div style=\"border:1px solid #2D2D2D;margin:0 0 20px 0;padding:0;background:#E8E6DE;\"><img src=\"{}\" alt=\"Daily visual\" style=\"width:100%;height:auto;display:block;\" /></div>",
         url
       )
     })
-    .unwrap_or_default();
+    .unwrap_or_else(|| {
+      "<div style=\"border:1px solid #2D2D2D;margin:0 0 20px 0;padding:40px 0;text-align:center;letter-spacing:0.2em;color:#2D2D2D;background:#ECEAE0;\">IMAGE WINDOW</div>".to_string()
+    });
 
-  // html_body from Cerebras is already HTML, but we need to ensure all text has proper color
-  // Sanitize: remove any structural elements that shouldn't be there
   let sanitized = sanitize_html_body(inner);
-  // Wrap content in a div that ensures text color is set
   let html_body = format!(
-    r#"<div style="color:#fdfdfd;">{}</div>"#,
+    r#"<div style="color:#2D2D2D;font-size:14px;line-height:1.7;">{}</div>"#,
     sanitized
   );
+
+  let quote = weather
+    .map(|w| html_escape(w))
+    .unwrap_or_else(|| "“Observe the rhythm of the day.”".into());
+
+  let barcode = build_barcode();
 
   format!(
     r#"<!DOCTYPE html>
@@ -88,28 +88,25 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> Str
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>W9 Daily Reminder</title>
 </head>
-<body style="background:#050505;padding:32px;font-family:'Courier New',Courier,monospace;">
+<body style="margin:0;padding:32px;background:#E4E1D8;font-family:'Courier New',Courier,monospace;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;border:2px solid #fdfdfd;padding:28px;background:#000;">
-          <tr><td style="text-align:left;">
-            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;background:#F9F9F7;border:1px solid #2D2D2D;padding:32px;">
+          <tr><td>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #2D2D2D;border-collapse:collapse;font-size:13px;text-transform:uppercase;color:#2D2D2D;margin-bottom:24px;">
               <tr>
-                <td style="width:42px;height:42px;border:2px solid #fdfdfd;text-align:center;vertical-align:middle;font-weight:bold;color:#fdfdfd;line-height:42px;font-size:16px;padding:0;margin:0;">W9</td>
-                <td style="padding-left:12px;vertical-align:middle;">
-                  <div style="color:#fdfdfd;font-size:18px;letter-spacing:0.1em;text-transform:uppercase;">W9 Daily Reminders</div>
-                  <div style="color:#9a9a9a;font-size:12px;">AI-assisted daily briefings</div>
-                </td>
+                <td style="width:33%;border-right:1px solid #2D2D2D;padding:10px;text-align:center;letter-spacing:0.2em;">{day_label}</td>
+                <td style="width:34%;border-right:1px solid #2D2D2D;padding:10px;text-align:center;letter-spacing:0.15em;">{date_label}</td>
+                <td style="width:33%;padding:10px;text-align:center;">{header_icons}</td>
               </tr>
             </table>
-            {weather_block}
             {image_block}
-            <div style="color:#fdfdfd;font-size:15px;line-height:1.6;font-family:'Courier New',Courier,monospace;margin-bottom:24px;">
-              {html_body}
+            {html_body}
+            <div style="border-top:1px solid #2D2D2D;margin-top:28px;padding-top:18px;display:flex;flex-wrap:wrap;gap:16px;color:#2D2D2D;">
+              <div style="flex:1;min-width:220px;text-align:center;font-size:13px;">{quote}</div>
+              <div style="flex:1;min-width:220px;display:flex;justify-content:center;align-items:flex-end;gap:2px;">{barcode}</div>
             </div>
-            <hr style="border:none;border-top:2px solid #1a1a1a;margin:32px 0;" />
-            <p style="margin:0;color:#686868;font-size:11px;line-height:1.4;text-transform:uppercase;">Console generated · zai-glm-4.6</p>
           </td></tr>
         </table>
       </td>
@@ -117,9 +114,13 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> Str
   </table>
 </body>
 </html>"#,
-    weather_block = weather_block,
+    day_label = day_label,
+    date_label = date_label,
+    header_icons = header_icons,
     image_block = image_block,
-    html_body = html_body
+    html_body = html_body,
+    quote = quote,
+    barcode = barcode
   )
 }
 
@@ -196,4 +197,43 @@ fn sanitize_html_body(html: &str) -> String {
   }
   
   cleaned
+}
+
+fn resolve_temporal_labels(tz_name: &str) -> (String, String) {
+  let tz: Tz = tz_name.parse().unwrap_or(chrono_tz::UTC);
+  let now: DateTime<Tz> = Utc::now().with_timezone(&tz);
+  let day = now.format("%A").to_string();
+  let date = now.format("%d.%m.%Y").to_string();
+  (day, date)
+}
+
+fn build_header_icons() -> String {
+  let icons = ["USR", "CLK", "DOC"];
+  icons
+    .iter()
+    .map(|label| {
+      format!(
+        "<span style=\"display:inline-block;border:1px solid #2D2D2D;padding:4px 8px;margin:0 2px;font-size:11px;letter-spacing:0.15em;\">{}</span>",
+        label
+      )
+    })
+    .collect::<Vec<_>>()
+    .join("")
+}
+
+fn build_barcode() -> String {
+  let pattern = [4, 2, 1, 3, 2, 5, 1, 4, 2, 3, 1, 4];
+  let mut dark = true;
+  pattern
+    .iter()
+    .map(|width| {
+      let color = if dark { "#2D2D2D" } else { "transparent" };
+      dark = !dark;
+      format!(
+        "<span style=\"display:inline-block;width:{}px;height:48px;background:{};\"></span>",
+        width, color
+      )
+    })
+    .collect::<Vec<_>>()
+    .join("")
 }
