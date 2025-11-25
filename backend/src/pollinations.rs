@@ -130,13 +130,10 @@ impl PollinationsClient {
       return Err(PollinationsError::MissingPrompt);
     }
 
-    // If API key is set, use API endpoint
+    // Authenticated endpoint when API key is available, otherwise public URL fallback
     if let Some(api_key) = &self.api_key {
       return self.generate_via_api(trimmed, api_key, model).await;
     }
-
-    // Fallback to direct URL generation (no auth required)
-    // Banner ratio: 1024x341 (3:1 horizontal banner, max 1024)
     Ok(self.build_public_url(trimmed, model))
   }
 
