@@ -120,22 +120,22 @@ impl PollinationsClient {
     }
 
     // Fallback to direct URL generation (no auth required)
-    // Banner ratio: 1920x640 (3:1 horizontal banner)
+    // Banner ratio: 1024x341 (3:1 horizontal banner, max 1024)
     let encoded = urlencoding::encode(trimmed);
     let seed = Utc::now().timestamp();
     let model_param = model
       .map(|m| format!("&model={}", urlencoding::encode(m)))
       .unwrap_or_default();
     Ok(format!(
-      "https://image.pollinations.ai/prompt/{}?width=1920&height=640&seed={}{}",
+      "https://image.pollinations.ai/prompt/{}?width=1024&height=341&seed={}{}",
       encoded, seed, model_param
     ))
   }
 
   async fn generate_via_api(&self, prompt: &str, api_key: &str, model: Option<&str>) -> Result<String, PollinationsError> {
     // Pollinations API uses GET requests with the prompt in the URL path
-    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1920&height=640&seed={seed}&model={model}&token={token}
-    // Banner ratio: 1920x640 (3:1 horizontal banner)
+    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1024&height=341&seed={seed}&model={model}&token={token}
+    // Banner ratio: 1024x341 (3:1 horizontal banner, max 1024)
     // Authentication: Add token as query parameter for API access
     let encoded = urlencoding::encode(prompt);
     let seed = Utc::now().timestamp();
@@ -146,7 +146,7 @@ impl PollinationsClient {
     
     // Build the URL with query parameters including authentication token
     let url = format!(
-      "https://image.pollinations.ai/prompt/{}?width=1920&height=640&seed={}{}{}",
+      "https://image.pollinations.ai/prompt/{}?width=1024&height=341&seed={}{}{}",
       encoded, seed, model_param, token_param
     );
     
