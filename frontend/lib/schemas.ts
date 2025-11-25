@@ -12,6 +12,7 @@ export const reminderSettingsSchema = z.object({
   imageProvider: z.enum(['pollinations', 'cloudflare']),
   imageModel: z.string().optional(),
   cloudflareModel: z.string().optional(),
+  cerebrasModel: z.string().optional(),
   summaryStyle: z.enum(['concise', 'detailed', 'bullet']),
 })
 
