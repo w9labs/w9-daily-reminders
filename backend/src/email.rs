@@ -72,10 +72,12 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>) -> Str
     .unwrap_or_default();
 
   // html_body from Cerebras is already HTML, but we need to ensure all text has proper color
+  // Sanitize: remove any structural elements that shouldn't be there
+  let sanitized = sanitize_html_body(inner);
   // Wrap content in a div that ensures text color is set
   let html_body = format!(
     r#"<div style="color:#fdfdfd;">{}</div>"#,
-    inner
+    sanitized
   );
 
   format!(
@@ -133,4 +135,49 @@ fn resolve_language(settings: &ReminderSettings) -> String {
     ("custom", Some(custom)) => custom.clone(),
     _ => settings.language.clone(),
   }
+}
+
+fn sanitize_html_body(html: &str) -> String {
+  // Remove common structural elements that Cerebras might incorrectly add
+  // Focus on removing headers, section dividers that shouldn't be in content
+  let mut cleaned = html.to_string();
+  
+  // Remove h1-h6 tags (both opening and closing) - these are structural, not content
+  for i in 1..=6 {
+    let open_tag = format!("<h{}", i);
+    let close_tag = format!("</h{}>", i);
+    
+    // Remove opening tags
+    while let Some(start) = cleaned.find(&open_tag) {
+      if let Some(end) = cleaned[start..].find('>') {
+        cleaned.replace_range(start..start + end + 1, "");
+      } else {
+        break;
+      }
+    }
+    
+    // Remove closing tags
+    while let Some(pos) = cleaned.find(&close_tag) {
+      cleaned.replace_range(pos..pos + close_tag.len(), "");
+    }
+  }
+  
+  // Remove hr tags (horizontal rules - structural dividers)
+  while let Some(start) = cleaned.find("<hr") {
+    if let Some(end) = cleaned[start..].find('>') {
+      cleaned.replace_range(start..start + end + 1, "");
+    } else {
+      break;
+    }
+  }
+  
+  // Clean up extra whitespace
+  cleaned = cleaned.trim().to_string();
+  
+  // If the result is empty or just whitespace, return a simple paragraph
+  if cleaned.trim().is_empty() {
+    return "<p>No events scheduled.</p>".to_string();
+  }
+  
+  cleaned
 }

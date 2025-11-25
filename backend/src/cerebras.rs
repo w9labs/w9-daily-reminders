@@ -87,7 +87,7 @@ impl CerebrasClient {
       "messages": [
         {
           "role": "system",
-          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The image_prompt should describe a random view with cozy feelings (e.g., a warm coffee shop, a peaceful reading nook, a serene landscape, a comfortable workspace). No explanations, no markdown, just the JSON object."
+          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The html_body must contain ONLY the event list content as simple HTML (use <p>, <ul>, <li>, <strong>, <br> tags only). Do NOT include: headers, titles, section dividers, h1-h6 tags, divs with classes, or any structural layout elements. Just the event content. The image_prompt should describe a random view with cozy feelings (e.g., a warm coffee shop, a peaceful reading nook, a serene landscape, a comfortable workspace). No explanations, no markdown, just the JSON object."
         },
         {
           "role": "user",
@@ -150,6 +150,7 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
     "Summary style: {}\n",
     summary_style_label(&settings.summary_style)
   ));
+  prompt.push_str("IMPORTANT: The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
   prompt.push_str("Events (ISO8601 in timezone, include location if any):\n");
   for event in events {
     prompt.push_str(&format!(
@@ -164,6 +165,7 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
     prompt.push_str("Weather note: ");
     prompt.push_str(weather);
     prompt.push('\n');
+    prompt.push_str("Note: Weather information will be displayed separately in the email template. Do NOT include weather in html_body.\n");
   }
   prompt.push_str("Return stringified JSON.");
   prompt
