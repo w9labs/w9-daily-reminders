@@ -27,7 +27,8 @@ pub fn build_preview(
   weather_advisory: Option<String>,
   image_url: Option<String>,
 ) -> Result<ReminderPreview, EmailBuildError> {
-  let parsed: CerebrasPayload = serde_json::from_str(cerebras_payload).map_err(|err| {
+  let sanitized = sanitize_control_chars(cerebras_payload);
+  let parsed: CerebrasPayload = serde_json::from_str(&sanitized).map_err(|err| {
     EmailBuildError::InvalidPayload(format!("{} · raw: {}", err, cerebras_payload))
   })?;
 
@@ -60,17 +61,17 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>, settin
   let image_block = image_url
     .map(|url| {
       format!(
-        "<div style=\"border:1px solid #2D2D2D;margin:0 0 20px 0;padding:0;background:#E8E6DE;\"><img src=\"{}\" alt=\"Daily visual\" style=\"width:100%;height:auto;display:block;\" /></div>",
+        "<tr><td style=\"padding:0 0 20px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border:1px solid #2D2D2D;background:#E8E6DE;\"><tr><td><img src=\"{}\" alt=\"Daily visual\" style=\"display:block;width:100%;height:auto;\" /></td></tr></table></td></tr>",
         url
       )
     })
     .unwrap_or_else(|| {
-      "<div style=\"border:1px solid #2D2D2D;margin:0 0 20px 0;padding:40px 0;text-align:center;letter-spacing:0.2em;color:#2D2D2D;background:#ECEAE0;\">IMAGE WINDOW</div>".to_string()
+      "<tr><td style=\"padding:0 0 20px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border:1px solid #2D2D2D;background:#ECEAE0;\"><tr><td style=\"padding:32px 0;text-align:center;letter-spacing:0.25em;color:#2D2D2D;\">IMAGE WINDOW</td></tr></table></td></tr>".to_string()
     });
 
   let sanitized = sanitize_html_body(inner);
   let html_body = format!(
-    r#"<div style="color:#2D2D2D;font-size:14px;line-height:1.7;">{}</div>"#,
+    "<tr><td style=\"color:#2D2D2D;font-size:14px;line-height:1.7;padding:0 0 12px 0;\">{}</td></tr>",
     sanitized
   );
 
@@ -88,25 +89,31 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>, settin
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>W9 Daily Reminder</title>
 </head>
-<body style="margin:0;padding:32px;background:#E4E1D8;font-family:'Courier New',Courier,monospace;">
+<body style="margin:0;padding:16px;background:#E4E1D8;font-family:'Courier New',Courier,monospace;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;background:#F9F9F7;border:1px solid #2D2D2D;padding:32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;max-width:640px;background:#F9F9F7;border:1px solid #2D2D2D;padding:24px;box-sizing:border-box;">
           <tr><td>
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #2D2D2D;border-collapse:collapse;font-size:13px;text-transform:uppercase;color:#2D2D2D;margin-bottom:24px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #2D2D2D;border-collapse:collapse;font-size:13px;text-transform:uppercase;color:#2D2D2D;margin-bottom:20px;">
               <tr>
                 <td style="width:33%;border-right:1px solid #2D2D2D;padding:10px;text-align:center;letter-spacing:0.2em;">{day_label}</td>
                 <td style="width:34%;border-right:1px solid #2D2D2D;padding:10px;text-align:center;letter-spacing:0.15em;">{date_label}</td>
                 <td style="width:33%;padding:10px;text-align:center;">{header_icons}</td>
               </tr>
             </table>
-            {image_block}
-            {html_body}
-            <div style="border-top:1px solid #2D2D2D;margin-top:28px;padding-top:18px;display:flex;flex-wrap:wrap;gap:16px;color:#2D2D2D;">
-              <div style="flex:1;min-width:220px;text-align:center;font-size:13px;">{quote}</div>
-              <div style="flex:1;min-width:220px;display:flex;justify-content:center;align-items:flex-end;gap:2px;">{barcode}</div>
-            </div>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+              {image_block}
+              {html_body}
+            </table>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-top:1px solid #2D2D2D;margin-top:20px;padding-top:16px;color:#2D2D2D;font-size:13px;">
+              <tr>
+                <td style="padding:0 0 12px 0;text-align:center;">{quote}</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 0;text-align:center;">{barcode}</td>
+              </tr>
+            </table>
           </td></tr>
         </table>
       </td>
@@ -236,4 +243,26 @@ fn build_barcode() -> String {
     })
     .collect::<Vec<_>>()
     .join("")
+}
+
+fn sanitize_control_chars(input: &str) -> String {
+  let mut needs_sanitize = false;
+  for ch in input.chars() {
+    if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+      needs_sanitize = true;
+      break;
+    }
+  }
+  if !needs_sanitize {
+    return input.to_string();
+  }
+  let mut sanitized = String::with_capacity(input.len());
+  for ch in input.chars() {
+    if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+      sanitized.push_str(&format!("\\u{:04X}", ch as u32));
+    } else {
+      sanitized.push(ch);
+    }
+  }
+  sanitized
 }

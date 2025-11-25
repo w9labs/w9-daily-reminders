@@ -345,7 +345,13 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
     _ => sample_events(),
   };
   let weather_note = if payload.include_weather {
-    Some(state.weather.advisory(&payload.weather_location).await?)
+    match state.weather.advisory(&payload.weather_location).await {
+      Ok(note) => Some(note),
+      Err(err) => {
+        tracing::warn!(?err, "weather advisory unavailable");
+        None
+      }
+    }
   } else {
     None
   };

@@ -13,7 +13,9 @@ static CLOUDFLARE_MODELS: &[&str] = &[
   "@cf/bytedance/stable-diffusion-xl-lightning",
   "@cf/stabilityai/stable-diffusion-xl-base-1.0",
   "@cf/runwayml/stable-diffusion-v1-5-inpainting",
+  "@cf/runwayml/stable-diffusion-v1-5-img2img",
 ];
+static MASK_REQUIRED_MODELS: &[&str] = &["@cf/runwayml/stable-diffusion-v1-5-inpainting"];
 
 #[derive(Debug, Error)]
 pub enum CloudflareAiError {
@@ -21,6 +23,8 @@ pub enum CloudflareAiError {
   MissingAccountId,
   #[error("cloudflare api token missing")]
   MissingApiToken,
+  #[error("model requires inputs the app does not provide: {0}")]
+  UnsupportedModel(String),
   #[error("http error: {0}")]
   Request(#[from] reqwest::Error),
   #[error("serde error: {0}")]
@@ -63,6 +67,12 @@ impl CloudflareAiClient {
 
   pub async fn generate(&self, prompt: &str, model: Option<&str>) -> Result<String, CloudflareAiError> {
     let model_name = model.filter(|m| !m.is_empty()).unwrap_or(CLOUDFLARE_MODELS[0]);
+    if MASK_REQUIRED_MODELS.contains(&model_name) {
+      return Err(CloudflareAiError::UnsupportedModel(format!(
+        "{} requires mask/image inputs which are not supported in this workflow",
+        model_name
+      )));
+    }
     let url = format!(
       "{}/accounts/{}/ai/run/{}",
       self.api_base.trim_end_matches('/'),
@@ -123,7 +133,8 @@ fn build_payload(model: &str, prompt: &str) -> serde_json::Value {
   let seed = Utc::now().timestamp();
   match model {
     "@cf/bytedance/stable-diffusion-xl-lightning"
-    | "@cf/stabilityai/stable-diffusion-xl-base-1.0" => serde_json::json!({
+    | "@cf/stabilityai/stable-diffusion-xl-base-1.0"
+    | "@cf/runwayml/stable-diffusion-v1-5-img2img" => serde_json::json!({
       "prompt": prompt,
       "width": 1024,
       "height": 256,

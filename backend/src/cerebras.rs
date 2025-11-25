@@ -230,7 +230,7 @@ fn extract_json_from_text(text: &str) -> String {
   }
   // If no JSON found, return the text as-is (might be plain JSON)
   text.trim().to_string()
-}
+  }
 
 fn schema_definition() -> serde_json::Value {
   json!({
