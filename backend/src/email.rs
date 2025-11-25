@@ -32,7 +32,7 @@ pub fn build_preview(
     EmailBuildError::InvalidPayload(format!("{} · raw: {}", err, cerebras_payload))
   })?;
 
-  let html = wrap_html(&parsed.html_body, weather_advisory.as_deref(), image_url.as_deref(), settings);
+  let html = wrap_html(&parsed.html_body, &parsed.preview, weather_advisory.as_deref(), image_url.as_deref(), settings);
   let text = wrap_text(&parsed.text_body, weather_advisory.as_deref());
 
   Ok(ReminderPreview {
@@ -54,24 +54,30 @@ fn html_escape(input: &str) -> String {
     .replace('\'', "&#x27;")
 }
 
-fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>, settings: &ReminderSettings) -> String {
+fn wrap_html(
+  inner: &str,
+  preview_text: &str,
+  weather: Option<&str>,
+  image_url: Option<&str>,
+  settings: &ReminderSettings,
+) -> String {
   let (day_label, date_label) = resolve_temporal_labels(&settings.timezone);
-  let header_icons = build_header_icons();
+
 
   let image_block = image_url
     .map(|url| {
       format!(
-        "<tr><td style=\"padding:0 0 20px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border:1px solid #2D2D2D;background:#E8E6DE;\"><tr><td><img src=\"{}\" alt=\"Daily visual\" style=\"display:block;width:100%;height:auto;\" /></td></tr></table></td></tr>",
+        "<tr><td style=\"padding:0;\"><img src=\"{}\" alt=\"Daily visual\" style=\"display:block;width:100%;height:auto;border-bottom:1px solid #2D2D2D;\" /></td></tr>",
         url
       )
     })
     .unwrap_or_else(|| {
-      "<tr><td style=\"padding:0 0 20px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border:1px solid #2D2D2D;background:#ECEAE0;\"><tr><td style=\"padding:32px 0;text-align:center;letter-spacing:0.25em;color:#2D2D2D;\">IMAGE WINDOW</td></tr></table></td></tr>".to_string()
+      "<tr><td style=\"padding:40px 0;text-align:center;letter-spacing:0.2em;color:#2D2D2D;border-bottom:1px solid #2D2D2D;background:#ECEAE0;\">IMAGE WINDOW</td></tr>".to_string()
     });
 
   let sanitized = sanitize_html_body(inner);
   let html_body = format!(
-    "<tr><td style=\"color:#2D2D2D;font-size:14px;line-height:1.7;padding:0 0 12px 0;\">{}</td></tr>",
+    "<tr><td class=\"content-padding\" style=\"color:#1a1a1a;font-size:16px;line-height:1.6;padding:32px 40px;\">{}</td></tr>",
     sanitized
   );
 
@@ -88,42 +94,63 @@ fn wrap_html(inner: &str, weather: Option<&str>, image_url: Option<&str>, settin
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>W9 Daily Reminder</title>
+  <style>
+    @media screen and (max-width: 600px) {{
+      .wrapper {{ padding: 0 !important; }}
+      .container {{ width: 100% !important; border-left: none !important; border-right: none !important; }}
+      .content-padding {{ padding: 24px 20px !important; }}
+      .header-padding {{ padding: 16px 20px !important; }}
+      .mobile-hidden {{ display: none !important; }}
+    }}
+  </style>
 </head>
-<body style="margin:0;padding:16px;background:#E4E1D8;font-family:'Courier New',Courier,monospace;">
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+<body style="margin:0;padding:0;background-color:#E4E1D8;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;color:#1a1a1a;">
+  <div style="display:none;font-size:1px;color:#E4E1D8;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+    {preview_text}
+  </div>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#E4E1D8;">
     <tr>
-      <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;max-width:640px;background:#F9F9F7;border:1px solid #2D2D2D;padding:24px;box-sizing:border-box;">
-          <tr><td>
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #2D2D2D;border-collapse:collapse;font-size:13px;text-transform:uppercase;color:#2D2D2D;margin-bottom:20px;">
-              <tr>
-                <td style="width:33%;border-right:1px solid #2D2D2D;padding:10px;text-align:center;letter-spacing:0.2em;">{day_label}</td>
-                <td style="width:34%;border-right:1px solid #2D2D2D;padding:10px;text-align:center;letter-spacing:0.15em;">{date_label}</td>
-                <td style="width:33%;padding:10px;text-align:center;">{header_icons}</td>
-              </tr>
-            </table>
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-              {image_block}
-              {html_body}
-            </table>
-            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-top:1px solid #2D2D2D;margin-top:20px;padding-top:16px;color:#2D2D2D;font-size:13px;">
-              <tr>
-                <td style="padding:0 0 12px 0;text-align:center;">{quote}</td>
-              </tr>
-              <tr>
-                <td style="padding:12px 0;text-align:center;">{barcode}</td>
-              </tr>
-            </table>
-          </td></tr>
+      <td align="center" class="wrapper" style="padding: 32px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" class="container" style="max-width:600px;background-color:#F9F9F7;border:1px solid #2D2D2D;box-shadow: 4px 4px 0px rgba(45, 45, 45, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td class="header-padding" style="padding: 20px 40px; border-bottom: 1px solid #2D2D2D; background-color: #F9F9F7;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-family:'Courier New', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;">{day_label}</td>
+                  <td align="right" style="font-family:'Courier New', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;">{date_label}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Image -->
+          {image_block}
+          
+          <!-- Content -->
+          {html_body}
+          
+          <!-- Footer -->
+          <tr>
+            <td class="content-padding" style="padding: 0 40px 40px 40px; text-align: center;">
+              <div style="border-top: 1px solid #2D2D2D; padding-top: 24px; margin-bottom: 24px;">
+                <p style="font-family:'Courier New', monospace; font-size: 13px; font-style: italic; margin: 0; color: #4a4a4a;">{quote}</p>
+              </div>
+              {barcode}
+              <div style="margin-top: 24px; font-family:'Courier New', monospace; font-size: 10px; color: #888; letter-spacing: 0.1em; text-transform: uppercase;">
+                W9 Daily Reminder System
+              </div>
+            </td>
+          </tr>
         </table>
       </td>
     </tr>
   </table>
 </body>
 </html>"#,
+    preview_text = preview_text,
     day_label = day_label,
     date_label = date_label,
-    header_icons = header_icons,
     image_block = image_block,
     html_body = html_body,
     quote = quote,
@@ -214,19 +241,7 @@ fn resolve_temporal_labels(tz_name: &str) -> (String, String) {
   (day, date)
 }
 
-fn build_header_icons() -> String {
-  let icons = ["USR", "CLK", "DOC"];
-  icons
-    .iter()
-    .map(|label| {
-      format!(
-        "<span style=\"display:inline-block;border:1px solid #2D2D2D;padding:4px 8px;margin:0 2px;font-size:11px;letter-spacing:0.15em;\">{}</span>",
-        label
-      )
-    })
-    .collect::<Vec<_>>()
-    .join("")
-}
+
 
 fn build_barcode() -> String {
   let pattern = [4, 2, 1, 3, 2, 5, 1, 4, 2, 3, 1, 4];
