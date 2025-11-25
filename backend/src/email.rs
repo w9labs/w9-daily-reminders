@@ -94,6 +94,9 @@ fn wrap_html(
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>W9 Daily Reminder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     @media screen and (max-width: 600px) {{
       .wrapper {{ padding: 0 !important; }}
@@ -104,7 +107,7 @@ fn wrap_html(
     }}
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:#E4E1D8;font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;color:#1a1a1a;">
+<body style="margin:0;padding:0;background-color:#E4E1D8;font-family:'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;color:#1a1a1a;">
   <div style="display:none;font-size:1px;color:#E4E1D8;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
     {preview_text}
   </div>
@@ -117,8 +120,11 @@ fn wrap_html(
             <td class="header-padding" style="padding: 20px 40px; border-bottom: 1px solid #2D2D2D; background-color: #F9F9F7;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="font-family:'Courier New', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;">{day_label}</td>
-                  <td align="right" style="font-family:'Courier New', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;">{date_label}</td>
+                  <td style="width:33%;font-family:'Roboto Mono', 'Courier New', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;">{day_label}</td>
+                  <td align="center" style="width:34%;">
+                    <span style="display:inline-block;border:1px solid #2D2D2D;width:32px;height:32px;line-height:32px;text-align:center;font-family:'Roboto Mono', 'Courier New', monospace;font-size:12px;font-weight:bold;color:#2D2D2D;">W9</span>
+                  </td>
+                  <td align="right" style="width:33%;font-family:'Roboto Mono', 'Courier New', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;">{date_label}</td>
                 </tr>
               </table>
             </td>
@@ -134,10 +140,10 @@ fn wrap_html(
           <tr>
             <td class="content-padding" style="padding: 0 40px 40px 40px; text-align: center;">
               <div style="border-top: 1px solid #2D2D2D; padding-top: 24px; margin-bottom: 24px;">
-                <p style="font-family:'Courier New', monospace; font-size: 13px; font-style: italic; margin: 0; color: #4a4a4a;">{quote}</p>
+                <p style="font-family:'Roboto Mono', 'Courier New', monospace; font-size: 13px; font-style: italic; margin: 0; color: #4a4a4a;">{quote}</p>
               </div>
               {barcode}
-              <div style="margin-top: 24px; font-family:'Courier New', monospace; font-size: 10px; color: #888; letter-spacing: 0.1em; text-transform: uppercase;">
+              <div style="margin-top: 24px; font-family:'Roboto Mono', 'Courier New', monospace; font-size: 10px; color: #888; letter-spacing: 0.1em; text-transform: uppercase;">
                 W9 Daily Reminder System
               </div>
             </td>
