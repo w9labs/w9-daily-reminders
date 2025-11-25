@@ -1,5 +1,8 @@
+use base64::engine::general_purpose::STANDARD as Base64;
+use base64::Engine;
 use chrono::Utc;
 use parking_lot::RwLock;
+use reqwest::header::{HeaderValue, CONTENT_TYPE, REFERER, USER_AGENT};
 use std::sync::Arc;
 use std::time::SystemTime;
 use thiserror::Error;
@@ -92,7 +95,12 @@ impl PollinationsClient {
     // If API key is available, add it as Bearer token for authenticated requests
     let mut request = self.http.get(url);
     if let Some(api_key) = &self.api_key {
-      request = request.bearer_auth(api_key);
+      request = request
+        .bearer_auth(api_key)
+        .header(
+          REFERER,
+          HeaderValue::from_str(&self.resolve_referer()).unwrap_or_else(|_| HeaderValue::from_static("https://reminder.w9.nu/")),
+        );
     }
     
     let resp = request.send().await?;
@@ -134,25 +142,54 @@ impl PollinationsClient {
 
   async fn generate_via_api(&self, prompt: &str, api_key: &str, model: Option<&str>) -> Result<String, PollinationsError> {
     // Pollinations API uses GET requests with the prompt in the URL path
-    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1024&height=341&seed={seed}&model={model}&token={token}
+    // Format: https://image.pollinations.ai/prompt/{prompt}?width=1024&height=341&seed={seed}&model={model}
     // Banner ratio: 1024x341 (3:1 horizontal banner, max 1024)
-    // Authentication: Add token as query parameter for API access
     let encoded = urlencoding::encode(prompt);
     let seed = Utc::now().timestamp();
     let model_param = model
       .map(|m| format!("&model={}", urlencoding::encode(m)))
       .unwrap_or_default();
-    let token_param = format!("&token={}", urlencoding::encode(api_key));
     
-    // Build the URL with query parameters including authentication token
     let url = format!(
-      "https://image.pollinations.ai/prompt/{}?width=1024&height=341&seed={}{}{}",
-      encoded, seed, model_param, token_param
+      "https://image.pollinations.ai/prompt/{}?width=1024&height=341&seed={}{}",
+      encoded, seed, model_param
     );
-    
-    // The API token is required for accessing premium models like gptimage
-    // The URL itself works and returns the image directly when authenticated
-    Ok(url)
+
+    let referer = self.resolve_referer();
+
+    let response = self
+      .http
+      .get(&url)
+      .bearer_auth(api_key)
+      .header(
+        REFERER,
+        HeaderValue::from_str(&referer).unwrap_or_else(|_| HeaderValue::from_static("https://reminder.w9.nu/")),
+      )
+      .header(USER_AGENT, HeaderValue::from_static("w9-daily-reminders/1.0"))
+      .send()
+      .await?;
+
+    if !response.status().is_success() {
+      let body = response.text().await.unwrap_or_default();
+      return Err(PollinationsError::Api(format!(
+        "Pollinations request failed ({}): {}",
+        response.status(),
+        body
+      )));
+    }
+
+    let mime = response
+      .headers()
+      .get(CONTENT_TYPE)
+      .and_then(|value| value.to_str().ok())
+      .unwrap_or("image/jpeg");
+    let bytes = response.bytes().await?;
+    let encoded = Base64.encode(bytes);
+    Ok(format!("data:{};base64,{}", mime, encoded))
+  }
+
+  fn resolve_referer(&self) -> String {
+    std::env::var("POLLINATIONS_REFERRER").unwrap_or_else(|_| "https://reminder.w9.nu/".to_string())
   }
 }
 
