@@ -532,21 +532,25 @@ fn extract_image_prompt(raw: &str) -> Result<String, ApiError> {
 }
 
 fn prepare_image_prompt(prompt: &str, provider: ImageProvider, model: Option<&str>) -> String {
-  let mut sanitized = prompt
+  let cleaned = prompt
     .trim()
     .replace('"', "")
     .replace("“", "")
-    .replace("”", "");
+    .replace("”", "")
+    .replace("—", "-")
+    .replace("–", "-");
 
   if matches!(provider, ImageProvider::Cloudflare)
-    && model
-      .map(|m| m.contains("flux-2-dev"))
-      .unwrap_or(true)
+    && model.map(|m| m.contains("flux-2-dev")).unwrap_or(true)
   {
-    sanitized.push_str(" | abstract atmospheric concept art, purely environmental scene, no public figures, no brand logos, no text overlays, anonymous scenery only");
+    // Compose a moderation-safe template that keeps the vibe but bans people/brands explicitly.
+    format!(
+      "Cinematic atmospheric environmental concept art inspired by: {}. Focus on architecture, weather, light, and texture only. No people, faces, silhouettes, public figures, logos, trademarks, text overlays, or recognizable locations. Anonymous scenery, abstract shapes, subdued palette.",
+      cleaned
+    )
+  } else {
+    cleaned
   }
-
-  sanitized
 }
 
 #[derive(Debug)]
