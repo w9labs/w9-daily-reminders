@@ -306,10 +306,11 @@ fn parse_todo(task: GoogleTask) -> Result<Todo, GoogleError> {
         NaiveDate::parse_from_str(&d, "%Y-%m-%d")
           .ok()
           .and_then(|date| {
-            NaiveDateTime::new(date, NaiveTime::from_hms_opt(23, 59, 59)?)
-              .and_local_timezone(Utc)
-              .single()
+            NaiveTime::from_hms_opt(23, 59, 59)
+              .map(|time| NaiveDateTime::new(date, time))
+              .and_then(|ndt| ndt.and_local_timezone(Utc).single())
           })
+          .ok_or_else(|| chrono::ParseError::from(chrono::ParseErrorKind::Impossible))
       })
       .ok()
   });
