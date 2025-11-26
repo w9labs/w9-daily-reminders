@@ -326,8 +326,14 @@ fn sample_events() -> Vec<CalendarEvent> {
   ]
 }
 
-async fn fetch_google_events(state: &AppState, client: &GoogleClient, tokens: GoogleTokens) -> Result<Vec<CalendarEvent>, ApiError> {
-  let (events, refreshed) = client.list_events(&tokens).await?;
+async fn fetch_google_events(
+  state: &AppState,
+  client: &GoogleClient,
+  tokens: GoogleTokens,
+  time_min: chrono::DateTime<chrono::Utc>,
+  time_max: chrono::DateTime<chrono::Utc>,
+) -> Result<Vec<CalendarEvent>, ApiError> {
+  let (events, refreshed) = client.list_events(&tokens, time_min, time_max).await?;
   if let Some(new_tokens) = refreshed {
     state.store.write_google_tokens(Some(new_tokens)).await?;
   }
@@ -392,9 +398,21 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
       (week_start, week_start + Duration::days(7))
     }
   };
+
+  // Convert date range to UTC datetimes for Google API filtering
+  let start_dt_utc = start_date
+    .and_hms_opt(0, 0, 0)
+    .and_then(|dt| tz.from_local_datetime(&dt).single())
+    .map(|dt| dt.with_timezone(&chrono::Utc))
+    .unwrap_or(now);
+  let end_dt_utc = end_date
+    .and_hms_opt(0, 0, 0)
+    .and_then(|dt| tz.from_local_datetime(&dt).single())
+    .map(|dt| dt.with_timezone(&chrono::Utc))
+    .unwrap_or(now + Duration::days(1));
   
   let all_events = match (state.google.as_ref().as_ref(), state.store.read_google_tokens()) {
-    (Some(client), Some(tokens)) => match fetch_google_events(state, client, tokens.clone()).await {
+    (Some(client), Some(tokens)) => match fetch_google_events(state, client, tokens.clone(), start_dt_utc, end_dt_utc).await {
       Ok(events) => events,
       Err(err) => {
         tracing::warn!(?err, "google events fallback to sample");

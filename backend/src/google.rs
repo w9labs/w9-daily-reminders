@@ -74,6 +74,8 @@ impl GoogleClient {
   pub async fn list_events(
     &self,
     tokens: &GoogleTokens,
+    time_min: DateTime<Utc>,
+    time_max: DateTime<Utc>,
   ) -> Result<(Vec<CalendarEvent>, Option<GoogleTokens>), GoogleError> {
     let mut active_tokens = tokens.clone();
     let mut updated_tokens = None;
@@ -82,8 +84,11 @@ impl GoogleClient {
       updated_tokens = Some(active_tokens.clone());
     }
 
-    let now = Utc::now().to_rfc3339();
-    let url = format!("https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin={}&maxResults=10", urlencoding::encode(&now));
+    let url = format!(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin={}&timeMax={}&maxResults=50",
+      urlencoding::encode(&time_min.to_rfc3339()),
+      urlencoding::encode(&time_max.to_rfc3339())
+    );
     let resp: EventsResponse = self
       .http
       .get(url)
