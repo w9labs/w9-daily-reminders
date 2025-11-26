@@ -23,9 +23,12 @@ export default function Header() {
           <div className="session">
             {user ? (
               <>
-                <p>
-                  Signed in as <span className="mono">{user.email}</span> · {user.role.toUpperCase()}
-                </p>
+                <div
+                  className="pill"
+                  style={{ borderColor: '#00ffd0', color: '#00ffd0' }}
+                >
+                  SIGNED IN
+                </div>
                 <div className="actions">
                   <button
                     type="button"
@@ -41,12 +44,7 @@ export default function Header() {
               </>
             ) : (
               <div className="actions">
-                <Link href="/login" className="button ghost">
-                  Login
-                </Link>
-                <Link href="/register" className="button">
-                  Register
-                </Link>
+                <div className="pill">GUEST</div>
               </div>
             )}
           </div>

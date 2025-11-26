@@ -186,6 +186,17 @@ button,
   font-size: inherit;
 }
 
+.pill {
+  border: var(--frame-border-width) solid currentColor;
+  padding: 0.25rem 1.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+
 .nav-link.active,
 .nav-link:hover,
 button:hover,
