@@ -65,6 +65,67 @@ main.app {
   gap: 1rem;
 }
 
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 0.35rem;
+}
+
+.network-bar {
+  width: 100%;
+  border: 2px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.network-label {
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  display: block;
+}
+
+.network-tagline {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.network-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.network-link {
+  border: 2px solid var(--border);
+  padding: 0.35rem 0.75rem;
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.network-link small {
+  font-size: 0.7rem;
+  text-transform: none;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+}
+
+.network-link.active,
+.network-link:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
 .header h1 {
   font-size: 1.6rem;
   margin-bottom: 0.5rem;
@@ -311,6 +372,15 @@ textarea {
 
 .footer-links a:hover {
   text-decoration: underline;
+}
+
+.footer-bottom {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 600px) {

@@ -5,33 +5,36 @@ export default function Page() {
   return (
     <>
       <div className="box">
-        <h2 className="section-title">Mission</h2>
+        <h2 className="section-title">Daily calendar briefings, in one email</h2>
         <p>
-          W9 Daily Reminders is a production-grade orchestration service that transforms calendar data into intelligent, 
-          context-aware daily briefings. By seamlessly integrating Google Calendar synchronization, AI-powered content 
-          generation, and dynamic visual storytelling, we deliver personalized reminders that help users stay organized 
-          and informed.
+          W9 Daily Reminders takes your Google Calendar and Tasks, local weather, and a static creative brief and turns it into a single
+          beautifully formatted email in the Retro Astrological Calendar Card layout. It runs on your own infrastructure, using W9 Mail
+          to deliver HTML that matches the preview exactly.
         </p>
         <ul className="list">
           <li>
-            <strong>Enterprise-Grade Architecture</strong>: Built on Rust (Axum) and Next.js with secure OAuth2 integration, 
-            role-based access control, and production-ready deployment automation.
+            <strong>Day or week schedule</strong>: Choose between a focused day view with 4‑hour weather slices, or a weekly digest with
+            per‑day advisories (umbrella, coat, sunscreen, etc.).
           </li>
           <li>
-            <strong>AI-Powered Intelligence</strong>: Leverages Cerebras zai-glm-4.6 for context-aware email generation, 
-            ensuring each briefing is tailored to your schedule, preferences, and local context.
+            <strong>Calendar + Tasks together</strong>: Syncs Google Calendar events and Google Tasks, grouping them by day so deadlines,
+            meetings, and todos show up in the same narrative.
           </li>
           <li>
-            <strong>Visual Storytelling</strong>: Pollinations.ai integration with model selection and intelligent caching 
-            generates unique visual cues that complement your daily agenda.
+            <strong>Cerebras‑powered copy</strong>: Uses Cerebras models with strict JSON schemas to generate subject, preview text,
+            HTML body, plain text, and a safe hero prompt in one call.
           </li>
           <li>
-            <strong>Weather Intelligence</strong>: Location-based weather advisories provide actionable insights for 
-            your day, from umbrella reminders to heat warnings.
+            <strong>Cloudflare + Pollinations visuals</strong>: Pick Pollinations or Workers AI (flux‑1‑schnell, flux‑2‑dev, SDXL, etc.);
+            prompts are sanitized to avoid copyright and moderation issues.
           </li>
           <li>
-            <strong>W9 Mail Integration</strong>: Unified authentication, user management, and reliable email delivery 
-            through the W9 Mail infrastructure.
+            <strong>Exact preview = sent HTML</strong>: Every preview is cached and reused for test sends so what you see in the UI is
+            exactly what arrives in the inbox, including inline CID images.
+          </li>
+          <li>
+            <strong>W9 Labs stack</strong>: Rust + Axum backend, Next.js admin UI, Cerebras + Cloudflare integrations, and W9 Mail
+            delivery—maintained as a W9 Labs open‑source project.
           </li>
         </ul>
       </div>

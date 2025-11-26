@@ -315,7 +315,7 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
   if !events.is_empty() {
     prompt.push_str("\nEvents (Local Time):\n");
     let mut current_date = None;
-    for event in events {
+  for event in events {
       let start = event.start.with_timezone(&tz);
       let end = event.end.with_timezone(&tz);
       let event_date = start.date_naive();
@@ -327,14 +327,14 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
         prompt.push_str(&format!("\n{} {}:\n", weekday, event_date.format("%B %d")));
       }
       
-      prompt.push_str(&format!(
-        "- {} from {} to {} at {}\n",
-        event.summary,
+    prompt.push_str(&format!(
+      "- {} from {} to {} at {}\n",
+      event.summary,
         start.format("%H:%M"),
         end.format("%H:%M"),
-        event.location.as_deref().unwrap_or("N/A"),
-      ));
-    }
+      event.location.as_deref().unwrap_or("N/A"),
+    ));
+  }
   }
   
   if !todos.is_empty() {

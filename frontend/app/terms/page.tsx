@@ -1,93 +1,79 @@
+const serviceBullets = [
+  'Sync your Google Calendar + Tasks in day or week mode with configurable week starts.',
+  'Blend hourly or weekly weather guidance into the Retro Astrological Calendar Card template.',
+  'Generate subject, preview, HTML, text and hero art via Cerebras + Pollinations/Cloudflare with strict JSON schemas.',
+  'Deliver through W9 Mail with inline CID assets so Gmail and Outlook show banners reliably.',
+]
+
+const responsibilities = [
+  'Maintain secure credentials (enable Turnstile, rotate passwords, keep env secrets private).',
+  'Review AI output before forwarding to others; you control the final send.',
+  'Respect Google API quotas and terms when connecting shared calendars or task lists.',
+  'Avoid injecting PHI/PCI or other regulated data unless your hosting environment is compliant.',
+]
+
+const disclaimers = [
+  'Service is provided “as is.” Third-party outages (Google, Cerebras, Cloudflare, weather providers) can delay reminders.',
+  'AI copy may hallucinate. Always skim before sending.',
+  'Email delivery depends on W9 Mail or your SMTP config; we cannot guarantee inbox placement.',
+]
+
 export default function TermsPage() {
   return (
     <>
       <div className="box">
-        <h2 className="section-title">Terms of Service</h2>
-        <p>
-          By using W9 Daily Reminders, you agree to the following terms and conditions.
-        </p>
+        <h1>Terms of Service</h1>
+        <p className="subtitle">W9 Daily Reminders is a W9 Labs project. Using it means you accept these rules.</p>
       </div>
       <div className="box">
-        <h2 className="section-title">Service Description</h2>
-        <p>
-          W9 Daily Reminders is an AI-assisted daily reminder service that:
-        </p>
+        <h2 className="section-title">What The Service Does</h2>
         <ul className="list">
-          <li>Syncs with your Google Calendar to fetch upcoming events</li>
-          <li>Generates personalized reminder emails using AI (Cerebras zai-glm-4.6)</li>
-          <li>Includes weather information for your specified location</li>
-          <li>Generates visual content using Pollinations AI</li>
-          <li>Delivers emails at your specified time via W9 Mail infrastructure</li>
+          {serviceBullets.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       </div>
       <div className="box">
-        <h2 className="section-title">User Responsibilities</h2>
-        <p>
-          You are responsible for:
-        </p>
+        <h2 className="section-title">Your Responsibilities</h2>
         <ul className="list">
-          <li>Maintaining the security of your account credentials</li>
-          <li>Ensuring your Google Calendar OAuth tokens remain valid</li>
-          <li>Providing accurate email addresses and configuration settings</li>
-          <li>Complying with all applicable laws and regulations</li>
-          <li>Not using the service for spam, harassment, or illegal activities</li>
+          {responsibilities.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       </div>
       <div className="box">
-        <h2 className="section-title">Service Availability</h2>
-        <p>
-          W9 Daily Reminders is provided "as is" without warranties of any kind. We do not guarantee:
-        </p>
+        <h2 className="section-title">Availability & Disclaimers</h2>
         <ul className="list">
-          <li>Uninterrupted or error-free service</li>
-          <li>Accuracy of AI-generated content</li>
-          <li>Timely delivery of reminder emails</li>
-          <li>Availability of third-party services (Google Calendar, Cerebras, Pollinations)</li>
+          {disclaimers.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       </div>
       <div className="box">
-        <h2 className="section-title">Data and Privacy</h2>
+        <h2 className="section-title">Data & Privacy</h2>
         <p>
-          Your use of this service is subject to our <a href="/privacy">Privacy Policy</a>. 
-          We store your configuration, Google OAuth tokens, and email preferences locally on the server. 
-          Data is not shared with third parties except as necessary to provide the service (Google Calendar API, 
-          Cerebras API, Pollinations API, W9 Mail API).
+          Refer to our <a href="/privacy">Privacy Notice</a> for details on storage and deletion. We keep data on the server you run and
+          only share it with the providers listed there.
         </p>
-      </div>
-      <div className="box">
-        <h2 className="section-title">Limitation of Liability</h2>
-        <p>
-          W9 Daily Reminders and its operators are not liable for:
-        </p>
-        <ul className="list">
-          <li>Missed reminders or delayed email delivery</li>
-          <li>Inaccuracies in AI-generated content</li>
-          <li>Loss of data or service interruptions</li>
-          <li>Issues arising from third-party service outages</li>
-          <li>Any indirect, incidental, or consequential damages</li>
-        </ul>
       </div>
       <div className="box">
         <h2 className="section-title">Termination</h2>
         <p>
-          We reserve the right to suspend or terminate your access to the service at any time, 
-          with or without notice, for violation of these terms or for any other reason. 
-          You may delete your account and data at any time through the admin interface.
+          Admins may disable accounts or revoke Google tokens at any time. W9 Labs can suspend managed instances for abuse or security
+          concerns. You can delete your own account and cached previews through the UI.
         </p>
       </div>
       <div className="box">
-        <h2 className="section-title">Changes to Terms</h2>
+        <h2 className="section-title">Updates</h2>
         <p>
-          We may update these terms of service at any time. Continued use of the service 
-          after changes constitutes acceptance of the new terms. We recommend reviewing 
-          this page periodically.
+          Terms evolve as dependencies (Cerebras, Cloudflare, Google) change their policies. We’ll document significant updates in the
+          repo changelog. Continued use equals acceptance.
         </p>
       </div>
       <div className="box">
         <h2 className="section-title">Contact</h2>
         <p>
-          For questions about these terms, contact the system administrator or visit 
-          <a href="https://w9.nu" target="_blank" rel="noreferrer"> W9 Mail</a>.
+          Email <a href="mailto:hi@w9.se">hi@w9.se</a> for legal questions. W9 Labs is a non-profit collective operating across the EU/EEA.
         </p>
       </div>
     </>
