@@ -307,7 +307,12 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
   prompt.push_str("- Do NOT include headers, titles, section dividers, or any structural layout elements beyond what's specified\n");
   prompt.push_str("- Keep formatting clean and readable\n");
   prompt.push_str("Image prompt guidelines: describe a wide cinematic film or painted image that mirrors the emotional tone of the upcoming schedule. Use muted colors, natural light, film grain, and contemplative mood. Blend motifs from the provided example (urban night desk, minimalist sky, hillside hut, person in tall grass, classical hands, coastal train) with the actual events to keep it fresh.\n");
-  prompt.push_str("CRITICAL: Do NOT use real names, public figures, specific copyrighted titles, brand names, or specific movie/book titles in the image_prompt. Use generic descriptions instead (e.g., 'a person working', 'a meeting room', 'a movie theater'). This is to avoid safety filters.\n");
+  prompt.push_str("CRITICAL SAFETY RULES: \n");
+  prompt.push_str("1. Do NOT use any real names, public figures, celebrities, or politicians.\n");
+  prompt.push_str("2. Do NOT use any brand names (e.g., 'W9', 'Google', 'Apple', 'Nike') or logos.\n");
+  prompt.push_str("3. Do NOT use specific copyrighted titles of movies, books, or games.\n");
+  prompt.push_str("4. Use GENERIC descriptions only (e.g., instead of 'Brad Pitt', say 'a handsome man'; instead of 'Star Wars', say 'a sci-fi space battle').\n");
+  prompt.push_str("5. Focus on atmosphere, lighting, and composition rather than specific people or brands.\n");
   prompt.push_str("Example image prompt: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\"\n");
   
   let tz: Tz = settings.timezone.parse().unwrap_or(chrono_tz::UTC);
