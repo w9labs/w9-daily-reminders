@@ -29,18 +29,6 @@ export default function Header() {
                 >
                   SIGNED IN
                 </div>
-                <div className="actions">
-                  <button
-                    type="button"
-                    className="button ghost"
-                    onClick={() => {
-                      clearToken()
-                      router.push('/login')
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </div>
               </>
             ) : (
               <div className="actions">
