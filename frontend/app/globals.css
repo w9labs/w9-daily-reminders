@@ -103,8 +103,9 @@ main.app {
 
 .network-links {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
+  overflow-x: auto;
 }
 
 .network-link {
@@ -368,10 +369,12 @@ textarea {
 .footer-links {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
 .footer-links li {
   margin-bottom: 0.4rem;
+  white-space: nowrap;
 }
 
 .footer-links a {
