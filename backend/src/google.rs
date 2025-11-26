@@ -310,7 +310,7 @@ fn parse_todo(task: GoogleTask) -> Result<Todo, GoogleError> {
               .map(|time| NaiveDateTime::new(date, time))
               .and_then(|ndt| ndt.and_local_timezone(Utc).single())
           })
-          .ok_or_else(|| chrono::ParseError::from(chrono::ParseErrorKind::Impossible))
+          .ok_or_else(|| chrono::format::ParseError::from(chrono::format::ParseErrorKind::Impossible))
       })
       .ok()
   });
