@@ -151,12 +151,20 @@ fn build_payload(model: &str, prompt: &str) -> serde_json::Value {
       "strength": 0.9,
       "seed": seed,
     }),
-    "@cf/black-forest-labs/flux-2-dev" => serde_json::json!({
-      "prompt": prompt,
-      "width": 1024,
-      "height": 256,
-      "seed": seed,
-    }),
+    "@cf/black-forest-labs/flux-2-dev" => {
+      // flux-2-dev requires multipart format with body and contentType
+      serde_json::json!({
+        "multipart": {
+          "body": {
+            "prompt": prompt,
+            "width": 1024,
+            "height": 256,
+            "seed": seed,
+          },
+          "contentType": "application/json"
+        }
+      })
+    },
     "@cf/black-forest-labs/flux-1-schnell" => serde_json::json!({
       "prompt": prompt,
       "width": 1024,
