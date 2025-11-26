@@ -492,9 +492,12 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
   if payload.include_image {
     if let Ok(prompt) = extract_image_prompt(&raw) {
       match payload.image_provider {
-        ImageProvider::Pollinations => match state.pollinations.generate(&prompt, payload.image_model.as_deref()).await {
+        ImageProvider::Pollinations => {
+          let prepared = prepare_image_prompt(&prompt, ImageProvider::Pollinations, payload.image_model.as_deref());
+          match state.pollinations.generate(&prepared, payload.image_model.as_deref()).await {
           Ok(url) => image_url = Some(url),
           Err(err) => tracing::warn!(?err, "pollinations generation failed"),
+          }
         },
         ImageProvider::Cloudflare => {
           let client = state
@@ -502,7 +505,8 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
             .as_ref()
             .as_ref()
             .ok_or(ApiError::Unavailable("Cloudflare Workers AI not configured"))?;
-          match client.generate(&prompt, payload.cloudflare_model.as_deref()).await {
+          let prepared = prepare_image_prompt(&prompt, ImageProvider::Cloudflare, payload.cloudflare_model.as_deref());
+          match client.generate(&prepared, payload.cloudflare_model.as_deref()).await {
             Ok(url) => image_url = Some(url),
             Err(err) => tracing::warn!(?err, "cloudflare image generation failed"),
           }
@@ -525,6 +529,24 @@ fn extract_image_prompt(raw: &str) -> Result<String, ApiError> {
     .image_prompt
     .filter(|s| !s.trim().is_empty())
     .ok_or_else(|| ApiError::Unavailable("image prompt missing from Cerebras payload"))
+}
+
+fn prepare_image_prompt(prompt: &str, provider: ImageProvider, model: Option<&str>) -> String {
+  let mut sanitized = prompt
+    .trim()
+    .replace('"', "")
+    .replace("“", "")
+    .replace("”", "");
+
+  if matches!(provider, ImageProvider::Cloudflare)
+    && model
+      .map(|m| m.contains("flux-2-dev"))
+      .unwrap_or(true)
+  {
+    sanitized.push_str(" | abstract atmospheric concept art, purely environmental scene, no public figures, no brand logos, no text overlays, anonymous scenery only");
+  }
+
+  sanitized
 }
 
 #[derive(Debug)]

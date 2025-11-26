@@ -154,13 +154,19 @@ impl PollinationsClient {
 
     let referer = self.resolve_referer();
 
+    let (width, height) = if model_name.eq_ignore_ascii_case("gptimage") {
+      ("1536", "1024")
+    } else {
+      ("600", "150")
+    };
+
     let response = self
       .http
       .get(&url)
       .query(&[
         ("model", model_name),
-        ("width", "600"),
-        ("height", "150"),
+        ("width", width),
+        ("height", height),
         ("seed", &seed.to_string()),
         ("quality", "medium"),
         ("safe", "false"),
