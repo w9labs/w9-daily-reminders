@@ -6,6 +6,7 @@
   --bg: #000;
   --fg: #fff;
   --border: #fff;
+  --frame-border-width: 2px;
 }
 
 * {
@@ -54,7 +55,7 @@ main.app {
 .status,
 .table-wrapper,
 .site-footer {
-  border: 2px solid var(--border);
+  border: var(--frame-border-width) solid var(--border);
 }
 
 .header {
@@ -75,7 +76,7 @@ main.app {
 
 .network-bar {
   width: 100%;
-  border: 2px solid var(--border);
+  border: var(--frame-border-width) solid var(--border);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
