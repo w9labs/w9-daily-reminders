@@ -102,7 +102,7 @@ impl CerebrasClient {
       "messages": [
         {
           "role": "system",
-          "content": "You are W9 Reminders AI. Output ONLY valid JSON with keys subject, preview, html_body, text_body, image_prompt. The html_body must contain ONLY the event list content as simple HTML (use <p>, <ul>, <li>, <strong>, <br> tags only). Do NOT include: headers, titles, section dividers, h1-h6 tags, divs with classes, or any structural layout elements. Just the event content. The image_prompt must describe a wide cinematic film or painted image with a nostalgic, contemplative mood, referencing the current day's or week's schedule. Emphasize muted palettes, natural light, film grain, and atmospheric storytelling similar to: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\" Tailor the prompt to the actual events. No explanations, no markdown, just the JSON object."
+          "content": "You are W9 Reminders AI. Output ONLY valid JSON. Follow the user's formatting instructions precisely. Do not output markdown code blocks."
         },
         {
           "role": "user",
@@ -289,12 +289,23 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
   }
   
   prompt.push_str("IMPORTANT: Output the JSON keys in this EXACT order: subject, preview, text_body, image_prompt, html_body. This is critical.\n");
-  prompt.push_str("The html_body field must contain ONLY the event and todo content as HTML. Format it beautifully with proper structure:\n");
+  prompt.push_str("The html_body field must contain ONLY the event and task content as HTML. Format it beautifully with proper structure:\n");
+  prompt.push_str("\nFor EVENTS:\n");
   prompt.push_str("- Group events by day (for weekly) or time (for daily)\n");
   prompt.push_str("- Use <p><strong>Day/Time</strong></p> for section headers\n");
-  prompt.push_str("- Use <ul><li>...</li></ul> for event lists\n");
-  prompt.push_str("- Use <p><em>Todos:</em></p> followed by <ul><li>...</li></ul> for todos\n");
-  prompt.push_str("- Use simple HTML tags like <p>, <ul>, <li>, <strong>, <em>, <br>. Do NOT include headers, titles, section dividers, or any structural layout elements beyond what's specified.\n");
+  prompt.push_str("- Use <ul><li>Event title from HH:MM to HH:MM at Location</li></ul> for event lists\n");
+  prompt.push_str("\nFor TASKS (from Google Tasks):\n");
+  prompt.push_str("- Use <p><strong>Tasks</strong></p> as a section header\n");
+  prompt.push_str("- Group tasks by due date for weekly mode (use <p><strong>Tasks - Day, Date</strong></p> for each day)\n");
+  prompt.push_str("- For daily mode, list all tasks together under <p><strong>Tasks</strong></p>\n");
+  prompt.push_str("- Format each task as: <li>Task title <em>(due: HH:MM)</em></li> if it has a due date\n");
+  prompt.push_str("- Format each task as: <li>Task title</li> if it has no due date\n");
+  prompt.push_str("- If a task has notes, add them on the same line: <li>Task title <em>(due: HH:MM)</em> — Note text</li>\n");
+  prompt.push_str("- Use <ul><li>...</li></ul> for task lists\n");
+  prompt.push_str("\nGeneral rules:\n");
+  prompt.push_str("- Use simple HTML tags like <p>, <ul>, <li>, <strong>, <em>, <br>\n");
+  prompt.push_str("- Do NOT include headers, titles, section dividers, or any structural layout elements beyond what's specified\n");
+  prompt.push_str("- Keep formatting clean and readable\n");
   prompt.push_str("Image prompt guidelines: describe a wide cinematic film or painted image that mirrors the emotional tone of the upcoming schedule. Use muted colors, natural light, film grain, and contemplative mood. Blend motifs from the provided example (urban night desk, minimalist sky, hillside hut, person in tall grass, classical hands, coastal train) with the actual events to keep it fresh.\n");
   prompt.push_str("Example image prompt to emulate: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\"\n");
   
@@ -326,15 +337,42 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
   }
   
   if !todos.is_empty() {
-    prompt.push_str("\nTodos:\n");
+    prompt.push_str("\nTasks from Google Tasks (these appear in your calendar):\n");
+    let mut current_task_date: Option<chrono::NaiveDate> = None;
+    let mut has_no_due_tasks = false;
+    
     for todo in todos {
+      // Group tasks by date for weekly mode
+      if matches!(settings.schedule_type, ScheduleType::Week) {
+        if let Some(due) = todo.due {
+          let due_local = due.with_timezone(&tz);
+          let task_date = due_local.date_naive();
+          if current_task_date != Some(task_date) {
+            current_task_date = Some(task_date);
+            let weekday = due_local.weekday();
+            prompt.push_str(&format!("\n{} {} - Tasks:\n", weekday, task_date.format("%B %d")));
+          }
+        } else if !has_no_due_tasks {
+          has_no_due_tasks = true;
+          prompt.push_str("\nTasks (no due date):\n");
+        }
+      }
+      
       if let Some(due) = todo.due {
         let due_local = due.with_timezone(&tz);
-        prompt.push_str(&format!(
-          "- {} (due: {})\n",
-          todo.title,
-          due_local.format("%Y-%m-%d %H:%M"),
-        ));
+        if matches!(settings.schedule_type, ScheduleType::Day) {
+          prompt.push_str(&format!(
+            "- {} (due: {})\n",
+            todo.title,
+            due_local.format("%H:%M"),
+          ));
+        } else {
+          prompt.push_str(&format!(
+            "- {} (due: {})\n",
+            todo.title,
+            due_local.format("%H:%M"),
+          ));
+        }
       } else {
         prompt.push_str(&format!("- {}\n", todo.title));
       }

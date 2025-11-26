@@ -114,53 +114,64 @@ impl GoogleClient {
       updated_tokens = Some(active_tokens.clone());
     }
 
-    // First, get the default task list
+    // First, get all task lists
     let lists_url = "https://tasks.googleapis.com/tasks/v1/users/@me/lists";
-    let lists_resp: TaskListsResponse = self
+    let lists_resp: TaskListsResponse = match self
       .http
       .get(lists_url)
       .bearer_auth(&active_tokens.access_token)
       .send()
       .await?
-      .error_for_status()?
-      .json()
-      .await?;
+      .error_for_status()
+    {
+      Ok(resp) => resp.json().await?,
+      Err(e) => {
+        tracing::warn!(?e, "failed to fetch task lists");
+        return Ok((vec![], updated_tokens));
+      }
+    };
 
-    let default_list_id = lists_resp
-      .items
-      .iter()
-      .find(|list| list.id == "@default")
-      .map(|list| list.id.clone())
-      .unwrap_or_else(|| {
-        lists_resp
-          .items
-          .first()
-          .map(|list| list.id.clone())
-          .unwrap_or_else(|| "@default".into())
-      });
+    // Fetch tasks from all task lists (not just default)
+    let mut all_todos = Vec::new();
+    for task_list in lists_resp.items {
+      let tasks_url = format!(
+        "https://tasks.googleapis.com/tasks/v1/lists/{}/tasks?showCompleted=false&showHidden=false&maxResults=100",
+        urlencoding::encode(&task_list.id)
+      );
+      
+      match self
+        .http
+        .get(&tasks_url)
+        .bearer_auth(&active_tokens.access_token)
+        .send()
+        .await?
+        .error_for_status()
+      {
+        Ok(resp) => {
+          let tasks_resp: TasksResponse = match resp.json().await {
+            Ok(t) => t,
+            Err(e) => {
+              tracing::warn!(?e, list_id = %task_list.id, "failed to parse tasks response");
+              continue;
+            }
+          };
+          
+          if let Some(items) = tasks_resp.items {
+            for item in items {
+              if let Ok(todo) = parse_todo(item) {
+                all_todos.push(todo);
+              }
+            }
+          }
+        }
+        Err(e) => {
+          tracing::warn!(?e, list_id = %task_list.id, "failed to fetch tasks from list");
+          continue;
+        }
+      }
+    }
 
-    // Fetch tasks from the default list
-    let tasks_url = format!(
-      "https://tasks.googleapis.com/tasks/v1/lists/{}/tasks?showCompleted=false&maxResults=20",
-      urlencoding::encode(&default_list_id)
-    );
-    let tasks_resp: TasksResponse = self
-      .http
-      .get(&tasks_url)
-      .bearer_auth(&active_tokens.access_token)
-      .send()
-      .await?
-      .error_for_status()?
-      .json()
-      .await?;
-
-    let todos = tasks_resp
-      .items
-      .into_iter()
-      .filter_map(|item| parse_todo(item).ok())
-      .collect();
-
-    Ok((todos, updated_tokens))
+    Ok((all_todos, updated_tokens))
   }
 
   async fn request_tokens(
@@ -261,7 +272,8 @@ struct TaskList {
 
 #[derive(Debug, Deserialize)]
 struct TasksResponse {
-  items: Vec<GoogleTask>,
+  #[serde(default)]
+  items: Option<Vec<GoogleTask>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -274,14 +286,34 @@ struct GoogleTask {
   due: Option<String>,
   #[serde(default)]
   status: String,
+  #[serde(default)]
+  hidden: Option<bool>,
 }
 
 fn parse_todo(task: GoogleTask) -> Result<Todo, GoogleError> {
+  // Skip hidden tasks
+  if task.hidden.unwrap_or(false) {
+    return Err(GoogleError::Invalid("hidden task"));
+  }
+  
+  // Parse due date - Google Tasks API returns RFC3339 format
   let due = task.due.and_then(|d| {
+    // Try RFC3339 first
     DateTime::parse_from_rfc3339(&d)
       .map(|dt| dt.with_timezone(&Utc))
+      .or_else(|_| {
+        // Try date-only format (YYYY-MM-DD)
+        NaiveDate::parse_from_str(&d, "%Y-%m-%d")
+          .ok()
+          .and_then(|date| {
+            NaiveDateTime::new(date, NaiveTime::from_hms_opt(23, 59, 59)?)
+              .and_local_timezone(Utc)
+              .single()
+          })
+      })
       .ok()
   });
+  
   Ok(Todo {
     id: Uuid::new_v4(),
     title: task.title,
