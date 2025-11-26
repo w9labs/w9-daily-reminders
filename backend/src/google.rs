@@ -301,7 +301,8 @@ fn parse_todo(task: GoogleTask) -> Result<Todo, GoogleError> {
     // Try RFC3339 first
     DateTime::parse_from_rfc3339(&d)
       .map(|dt| dt.with_timezone(&Utc))
-      .or_else(|_| {
+      .ok()
+      .or_else(|| {
         // Try date-only format (YYYY-MM-DD)
         NaiveDate::parse_from_str(&d, "%Y-%m-%d")
           .ok()
@@ -310,9 +311,7 @@ fn parse_todo(task: GoogleTask) -> Result<Todo, GoogleError> {
               .map(|time| NaiveDateTime::new(date, time))
               .and_then(|ndt| ndt.and_local_timezone(Utc).single())
           })
-          .ok_or_else(|| chrono::format::ParseError::from(chrono::format::ParseErrorKind::Impossible))
       })
-      .ok()
   });
   
   Ok(Todo {
