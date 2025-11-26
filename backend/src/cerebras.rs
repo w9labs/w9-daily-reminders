@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use thiserror::Error;
 
 use crate::models::{CalendarEvent, ReminderSettings, SummaryStyle, Todo};
+use chrono::Datelike;
 use chrono_tz::Tz;
 
 #[derive(Debug, Error)]
@@ -399,7 +400,7 @@ fn repair_truncated_json(text: &str) -> Result<String, CerebrasError> {
   // Simple repair: assume it's a JSON object that got cut off.
   // Find the start
   let start = text.find('{').ok_or_else(|| CerebrasError::Invalid("no JSON start found".into()))?;
-  let mut working = text[start..].to_string();
+  let working = text[start..].to_string();
   
   // Try closing it with various suffixes
   let suffixes = ["}", "\"}", "\"]}", "\"]\"}"];

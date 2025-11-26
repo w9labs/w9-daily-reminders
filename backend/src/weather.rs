@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -171,10 +171,7 @@ impl WeatherClient {
     let mut day_notes = Vec::new();
     let day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     
-    for (idx, time_str) in daily.time.iter().enumerate() {
-      if idx >= 7 {
-        break;
-      }
+    for idx in 0..daily.time.len().min(7) {
       
       let max_temp = daily.apparent_temperature_max.get(idx).copied().unwrap_or(0.0);
       let min_temp = daily.temperature_2m_min.get(idx).copied().unwrap_or(0.0);

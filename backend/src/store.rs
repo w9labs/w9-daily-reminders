@@ -1,4 +1,4 @@
-use crate::models::{CachedPreview, GoogleTokens, HealthStatus, ReminderPreview, ReminderSettings, SystemConfig};
+use crate::models::{CachedPreview, GoogleTokens, HealthStatus, ReminderSettings, SystemConfig};
 use parking_lot::RwLock;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{path::PathBuf, sync::Arc};

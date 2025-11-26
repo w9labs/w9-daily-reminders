@@ -354,7 +354,7 @@ async fn fetch_google_todos(state: &AppState, client: &GoogleClient, tokens: Goo
 }
 
 async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result<ReminderPreview, ApiError> {
-  use chrono::{Duration, Weekday};
+  use chrono::{Datelike, Duration, TimeZone, Weekday};
   
   let now = chrono::Utc::now();
   let tz: chrono_tz::Tz = payload.timezone.parse().unwrap_or(chrono_tz::UTC);
