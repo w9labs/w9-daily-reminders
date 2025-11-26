@@ -14,6 +14,8 @@ export const reminderSettingsSchema = z.object({
   cloudflareModel: z.string().optional(),
   cerebrasModel: z.string().optional(),
   summaryStyle: z.enum(['concise', 'detailed', 'bullet']),
+  scheduleType: z.enum(['day', 'week']),
+  weekStartDay: z.enum(['monday', 'sunday']),
 })
 
 export type ReminderSettingsInput = z.infer<typeof reminderSettingsSchema>

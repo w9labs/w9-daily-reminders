@@ -19,5 +19,7 @@ export const DEFAULT_SETTINGS: Omit<ReminderSettings, 'userEmail'> = {
   cloudflareModel: '@cf/black-forest-labs/flux-2-dev',
   cerebrasModel: 'zai-glm-4.6',
   summaryStyle: 'concise',
+  scheduleType: 'day',
+  weekStartDay: 'monday',
 }
 

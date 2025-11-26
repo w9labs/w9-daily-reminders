@@ -223,6 +223,64 @@ export default function SettingsForm() {
       </div>
 
       <div className="row">
+        <label>Schedule type</label>
+        <div className="actions">
+          <label className="nav-link" style={{ cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="scheduleType"
+              value="day"
+              checked={settings.scheduleType === 'day'}
+              onChange={() => update('scheduleType', 'day')}
+            />
+            &nbsp;Day · Single day schedule
+          </label>
+          <label className="nav-link" style={{ cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="scheduleType"
+              value="week"
+              checked={settings.scheduleType === 'week'}
+              onChange={() => update('scheduleType', 'week')}
+            />
+            &nbsp;Week · Full week schedule
+          </label>
+        </div>
+        <small>
+          Day mode: Shows today's events with 4-hour weather updates (6 forecasts per day).
+          Week mode: Shows entire week with daily weather summary and attention notes.
+        </small>
+      </div>
+
+      {settings.scheduleType === 'week' && (
+        <div className="row">
+          <label>Week starts on</label>
+          <div className="actions">
+            <label className="nav-link" style={{ cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="weekStartDay"
+                value="monday"
+                checked={settings.weekStartDay === 'monday'}
+                onChange={() => update('weekStartDay', 'monday')}
+              />
+              &nbsp;Monday
+            </label>
+            <label className="nav-link" style={{ cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="weekStartDay"
+                value="sunday"
+                checked={settings.weekStartDay === 'sunday'}
+                onChange={() => update('weekStartDay', 'sunday')}
+              />
+              &nbsp;Sunday
+            </label>
+          </div>
+        </div>
+      )}
+
+      <div className="row">
         <label>Inclusions</label>
         <div className="actions">
           <label className="nav-link" style={{ cursor: 'pointer' }}>

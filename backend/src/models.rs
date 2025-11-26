@@ -24,6 +24,10 @@ pub struct ReminderSettings {
   pub cerebras_model: Option<String>,
   #[serde(default = "default_summary_style")]
   pub summary_style: SummaryStyle,
+  #[serde(default = "default_schedule_type")]
+  pub schedule_type: ScheduleType,
+  #[serde(default = "default_week_start_day")]
+  pub week_start_day: WeekStartDay,
 }
 
 fn default_summary_style() -> SummaryStyle {
@@ -40,6 +44,28 @@ pub enum SummaryStyle {
   Concise,
   Detailed,
   Bullet,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ScheduleType {
+  Day,
+  Week,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum WeekStartDay {
+  Monday,
+  Sunday,
+}
+
+fn default_schedule_type() -> ScheduleType {
+  ScheduleType::Day
+}
+
+fn default_week_start_day() -> WeekStartDay {
+  WeekStartDay::Monday
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,6 +91,8 @@ impl Default for ReminderSettings {
       cloudflare_model: None,
       cerebras_model: None,
       summary_style: SummaryStyle::Concise,
+      schedule_type: ScheduleType::Day,
+      week_start_day: WeekStartDay::Monday,
     }
   }
 }
@@ -137,6 +165,16 @@ pub struct CalendarEvent {
   pub start: DateTime<Utc>,
   pub end: DateTime<Utc>,
   pub location: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Todo {
+  pub id: Uuid,
+  pub title: String,
+  pub notes: Option<String>,
+  pub due: Option<DateTime<Utc>>,
+  pub completed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

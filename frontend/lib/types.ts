@@ -22,6 +22,8 @@ export interface ReminderSettings {
   cloudflareModel?: string
   cerebrasModel?: string
   summaryStyle: 'concise' | 'detailed' | 'bullet'
+  scheduleType: 'day' | 'week'
+  weekStartDay: 'monday' | 'sunday'
 }
 
 export interface ReminderPreview {

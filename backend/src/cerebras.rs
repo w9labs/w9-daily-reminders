@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use thiserror::Error;
 
-use crate::models::{CalendarEvent, ReminderSettings, SummaryStyle};
+use crate::models::{CalendarEvent, ReminderSettings, SummaryStyle, Todo};
 use chrono_tz::Tz;
 
 #[derive(Debug, Error)]
@@ -90,9 +90,10 @@ impl CerebrasClient {
     model: &str,
     settings: &ReminderSettings,
     events: &[CalendarEvent],
+    todos: &[Todo],
     weather: Option<&str>,
   ) -> Result<String, CerebrasError> {
-    let instructions = build_prompt(settings, events, weather);
+    let instructions = build_prompt(settings, events, todos, weather);
     
     // Build base request
     let mut req = serde_json::json!({
@@ -261,7 +262,9 @@ impl CerebrasClient {
   }
 }
 
-fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: Option<&str>) -> String {
+fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[Todo], weather: Option<&str>) -> String {
+  use crate::models::{ScheduleType, WeekStartDay};
+  
   let mut prompt = String::new();
   prompt.push_str("Generate AI reminder email copy for W9 brand. JSON only.\n");
   prompt.push_str(&format!("Language: {}\n", resolve_language(settings)));
@@ -269,29 +272,86 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], weather: 
     "Summary style: {}\n",
     summary_style_label(&settings.summary_style)
   ));
+  
+  // Add schedule type context
+  match settings.schedule_type {
+    ScheduleType::Day => {
+      prompt.push_str("Schedule type: Daily (single day)\n");
+    }
+    ScheduleType::Week => {
+      let week_start = match settings.week_start_day {
+        WeekStartDay::Monday => "Monday",
+        WeekStartDay::Sunday => "Sunday",
+      };
+      prompt.push_str(&format!("Schedule type: Weekly (starting on {})\n", week_start));
+    }
+  }
+  
   prompt.push_str("IMPORTANT: Output the JSON keys in this EXACT order: subject, preview, text_body, image_prompt, html_body. This is critical.\n");
-  prompt.push_str("The html_body field must contain ONLY the event content as HTML. Use simple HTML tags like <p>, <ul>, <li>, <strong>. Do NOT include headers, titles, section dividers, or any structural elements. Just the event list content.\n");
+  prompt.push_str("The html_body field must contain ONLY the event and todo content as HTML. Format it beautifully with proper structure:\n");
+  prompt.push_str("- Group events by day (for weekly) or time (for daily)\n");
+  prompt.push_str("- Use <p><strong>Day/Time</strong></p> for section headers\n");
+  prompt.push_str("- Use <ul><li>...</li></ul> for event lists\n");
+  prompt.push_str("- Use <p><em>Todos:</em></p> followed by <ul><li>...</li></ul> for todos\n");
+  prompt.push_str("- Use simple HTML tags like <p>, <ul>, <li>, <strong>, <em>, <br>. Do NOT include headers, titles, section dividers, or any structural layout elements beyond what's specified.\n");
   prompt.push_str("Image prompt guidelines: describe a wide cinematic film or painted image that mirrors the emotional tone of the upcoming schedule. Use muted colors, natural light, film grain, and contemplative mood. Blend motifs from the provided example (urban night desk, minimalist sky, hillside hut, person in tall grass, classical hands, coastal train) with the actual events to keep it fresh.\n");
   prompt.push_str("Example image prompt to emulate: \"A wide cinematic film or painted image with a nostalgic, contemplative mood. The image includes a moody urban scene with a laptop by a window at night, minimalist blue sky with clouds over an industrial structure, a lone wooden hut on rolling green hills with dramatic shadows, a person lying face down in tall grass, a close-up fragment of a classical painting showing two hands reaching for each other, and a coastal train passing by a turquoise ocean. All images share a muted color palette, natural light, film grain, and a quiet, peaceful atmosphere.\"\n");
-  prompt.push_str("Events (Local Time):\n");
+  
   let tz: Tz = settings.timezone.parse().unwrap_or(chrono_tz::UTC);
-  for event in events {
-    let start = event.start.with_timezone(&tz);
-    let end = event.end.with_timezone(&tz);
-    prompt.push_str(&format!(
-      "- {} from {} to {} at {}\n",
-      event.summary,
-      start.format("%Y-%m-%d %H:%M"),
-      end.format("%Y-%m-%d %H:%M"),
-      event.location.as_deref().unwrap_or("N/A"),
-    ));
+  
+  if !events.is_empty() {
+    prompt.push_str("\nEvents (Local Time):\n");
+    let mut current_date = None;
+    for event in events {
+      let start = event.start.with_timezone(&tz);
+      let end = event.end.with_timezone(&tz);
+      let event_date = start.date_naive();
+      
+      // Add date header for weekly mode
+      if matches!(settings.schedule_type, ScheduleType::Week) && current_date != Some(event_date) {
+        current_date = Some(event_date);
+        let weekday = start.weekday();
+        prompt.push_str(&format!("\n{} {}:\n", weekday, event_date.format("%B %d")));
+      }
+      
+      prompt.push_str(&format!(
+        "- {} from {} to {} at {}\n",
+        event.summary,
+        start.format("%H:%M"),
+        end.format("%H:%M"),
+        event.location.as_deref().unwrap_or("N/A"),
+      ));
+    }
   }
+  
+  if !todos.is_empty() {
+    prompt.push_str("\nTodos:\n");
+    for todo in todos {
+      if let Some(due) = todo.due {
+        let due_local = due.with_timezone(&tz);
+        prompt.push_str(&format!(
+          "- {} (due: {})\n",
+          todo.title,
+          due_local.format("%Y-%m-%d %H:%M"),
+        ));
+      } else {
+        prompt.push_str(&format!("- {}\n", todo.title));
+      }
+      if let Some(notes) = &todo.notes {
+        if !notes.trim().is_empty() {
+          prompt.push_str(&format!("  Note: {}\n", notes));
+        }
+      }
+    }
+  }
+  
   if let Some(weather) = weather {
-    prompt.push_str("Weather note: ");
+    prompt.push_str("\nWeather information: ");
     prompt.push_str(weather);
     prompt.push('\n');
     prompt.push_str("Note: Weather information will be displayed separately in the email template. Do NOT include weather in html_body.\n");
   }
+  
   prompt.push_str("Return stringified JSON.");
   prompt
 }

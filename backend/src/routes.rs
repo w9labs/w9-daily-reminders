@@ -16,7 +16,7 @@ use crate::{
   google::{GoogleClient, GoogleError},
   models::{
     ApiResponse, CachedPreview, CalendarEvent, GoogleAuthPayload, GoogleAuthResult, GoogleAuthStartResponse, GoogleTokens, HealthStatus,
-    ImageModelOptions, ImageProvider, MailSenderOption, ReminderPreview, ReminderSettings, SenderSelection, SystemConfig,
+    ImageModelOptions, ImageProvider, MailSenderOption, ReminderPreview, ReminderSettings, ScheduleType, SenderSelection, SystemConfig, Todo, WeekStartDay,
   },
   pollinations::{PollinationsClient, PollinationsError},
   store::DataStore,
@@ -338,9 +338,63 @@ async fn fetch_google_events(state: &AppState, client: &GoogleClient, tokens: Go
   }
 }
 
+async fn fetch_google_todos(state: &AppState, client: &GoogleClient, tokens: GoogleTokens) -> Result<Vec<Todo>, ApiError> {
+  match client.list_todos(&tokens).await {
+    Ok((todos, refreshed)) => {
+      if let Some(new_tokens) = refreshed {
+        state.store.write_google_tokens(Some(new_tokens)).await?;
+      }
+      Ok(todos)
+    }
+    Err(err) => {
+      tracing::warn!(?err, "google todos fetch failed, returning empty list");
+      Ok(vec![])
+    }
+  }
+}
+
 async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result<ReminderPreview, ApiError> {
-  let events = match (state.google.as_ref().as_ref(), state.store.read_google_tokens()) {
-    (Some(client), Some(tokens)) => match fetch_google_events(state, client, tokens).await {
+  use chrono::{Duration, Weekday};
+  
+  let now = chrono::Utc::now();
+  let tz: chrono_tz::Tz = payload.timezone.parse().unwrap_or(chrono_tz::UTC);
+  let local_now = now.with_timezone(&tz);
+  
+  // Calculate date range based on schedule type
+  let (start_date, end_date) = match payload.schedule_type {
+    ScheduleType::Day => {
+      let target_date = local_now.date_naive();
+      (target_date, target_date + Duration::days(1))
+    }
+    ScheduleType::Week => {
+      let week_start_offset = match payload.week_start_day {
+        WeekStartDay::Monday => {
+          let weekday = local_now.weekday();
+          let days_from_monday = weekday.num_days_from_monday() as i64;
+          -days_from_monday
+        }
+        WeekStartDay::Sunday => {
+          let weekday = local_now.weekday();
+          // Sunday is 0, Monday is 1, etc.
+          let days_from_sunday = match weekday {
+            Weekday::Sun => 0,
+            Weekday::Mon => 1,
+            Weekday::Tue => 2,
+            Weekday::Wed => 3,
+            Weekday::Thu => 4,
+            Weekday::Fri => 5,
+            Weekday::Sat => 6,
+          };
+          -days_from_sunday
+        }
+      };
+      let week_start = local_now.date_naive() + Duration::days(week_start_offset);
+      (week_start, week_start + Duration::days(7))
+    }
+  };
+  
+  let all_events = match (state.google.as_ref().as_ref(), state.store.read_google_tokens()) {
+    (Some(client), Some(tokens)) => match fetch_google_events(state, client, tokens.clone()).await {
       Ok(events) => events,
       Err(err) => {
         tracing::warn!(?err, "google events fallback to sample");
@@ -349,12 +403,62 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
     },
     _ => sample_events(),
   };
+  
+  // Filter events based on schedule type
+  let events: Vec<CalendarEvent> = all_events
+    .into_iter()
+    .filter(|event| {
+      let event_date = event.start.with_timezone(&tz).date_naive();
+      event_date >= start_date && event_date < end_date
+    })
+    .collect();
+  
+  let all_todos = match (state.google.as_ref().as_ref(), state.store.read_google_tokens()) {
+    (Some(client), Some(tokens)) => fetch_google_todos(state, client, tokens).await.unwrap_or_default(),
+    _ => vec![],
+  };
+  
+  // Filter todos based on schedule type
+  let todos: Vec<Todo> = all_todos
+    .into_iter()
+    .filter(|todo| {
+      if let Some(due) = todo.due {
+        let todo_date = due.with_timezone(&tz).date_naive();
+        todo_date >= start_date && todo_date < end_date
+      } else {
+        // Todos without due dates are included in day mode only
+        matches!(payload.schedule_type, ScheduleType::Day)
+      }
+    })
+    .collect();
+  
   let weather_note = if payload.include_weather {
-    match state.weather.advisory(&payload.weather_location).await {
-      Ok(note) => Some(note),
-      Err(err) => {
-        tracing::warn!(?err, "weather advisory unavailable");
-        None
+    match payload.schedule_type {
+      ScheduleType::Day => {
+        let target_date = start_date.and_hms_opt(0, 0, 0)
+          .and_then(|dt| tz.from_local_datetime(&dt).single())
+          .map(|dt| dt.with_timezone(&chrono::Utc))
+          .unwrap_or(now);
+        match state.weather.day_forecast_4h(&payload.weather_location, target_date).await {
+          Ok(note) => Some(note),
+          Err(err) => {
+            tracing::warn!(?err, "day weather forecast unavailable");
+            None
+          }
+        }
+      }
+      ScheduleType::Week => {
+        let week_start_dt = start_date.and_hms_opt(0, 0, 0)
+          .and_then(|dt| tz.from_local_datetime(&dt).single())
+          .map(|dt| dt.with_timezone(&chrono::Utc))
+          .unwrap_or(now);
+        match state.weather.week_forecast(&payload.weather_location, week_start_dt).await {
+          Ok(note) => Some(note),
+          Err(err) => {
+            tracing::warn!(?err, "week weather forecast unavailable");
+            None
+          }
+        }
       }
     }
   } else {
@@ -364,7 +468,7 @@ async fn generate_preview(state: &AppState, payload: ReminderSettings) -> Result
   let cerebras = state.cerebras.as_ref().as_ref().ok_or(ApiError::Unavailable("Cerebras API key missing"))?;
   let model = payload.cerebras_model.as_deref().unwrap_or("zai-glm-4.6");
   tracing::info!(model, "using Cerebras model for email generation");
-  let raw = cerebras.generate_email(model, &payload, &events, weather_note.as_deref()).await?;
+  let raw = cerebras.generate_email(model, &payload, &events, &todos, weather_note.as_deref()).await?;
 
   let mut image_url = None;
   if payload.include_image {
