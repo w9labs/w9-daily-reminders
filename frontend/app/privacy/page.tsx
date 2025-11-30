@@ -28,6 +28,11 @@ const sections = [
     ],
   },
   {
+    title: 'Data Sharing & Disclosure',
+    body:
+      'We do not sell, rent, or share your Google user data with advertisers, data brokers, or any third parties beyond what is strictly necessary to provide the service. Google user data (Calendar events and Tasks) is: (1) retrieved from Google APIs using read-only OAuth tokens you authorize, (2) processed by Cerebras AI to generate email content (your event/task details are included in prompts but not stored by Cerebras), (3) used to generate images via Cloudflare Workers AI or Pollinations (only the static image prompt is sent, not your personal data), and (4) delivered to you via W9 Mail SMTP service (your email address and generated content are transmitted for delivery only). We do not transfer Google user data to any other services, partners, or entities. All data processing occurs on servers you control, and cached previews are stored locally on your server only.',
+  },
+  {
     title: 'Retention & Deletion',
     body:
       'Everything lives on the server you operate. Delete an account or disconnect Google to remove tokens and cached previews. Weather + AI responses are discarded after they are embedded into the outgoing email. System backups, if enabled by you, should be encrypted.',
