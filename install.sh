@@ -73,6 +73,12 @@ ensure_node
 ensure_rust
 
 log "Updating Rust toolchain and dependencies (if possible)"
+# Make sure Cargo's bin dir is on PATH for this shell
+if [ -f "$HOME/.cargo/env" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.cargo/env"
+fi
+
 if command -v rustup >/dev/null 2>&1; then
   log "Updating Rust via rustup to stable"
   if ! rustup update stable >/dev/null 2>&1; then
@@ -95,6 +101,11 @@ cargo build --release
 
 log "Building frontend"
 cd "$ROOT_DIR/frontend"
+if [ "${AUTO_UPDATE_PACKAGE_JSON:-1}" != "0" ]; then
+  log "Updating package.json dependency ranges with npm-check-updates (best-effort)..."
+  npx npm-check-updates@latest -u || log "npm-check-updates failed, continuing with existing ranges"
+fi
+
 log "Installing npm dependencies (npm install)..."
 npm install --prefer-offline --no-audit || {
   echo "[w9] npm install failed"
