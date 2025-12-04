@@ -72,23 +72,41 @@ ensure_rust() {
 ensure_node
 ensure_rust
 
+log "Updating Rust toolchain and dependencies (if possible)"
+if command -v rustup >/dev/null 2>&1; then
+  log "Updating Rust via rustup to stable"
+  if ! rustup update stable >/dev/null 2>&1; then
+    log "rustup update failed, continuing with existing toolchain"
+  fi
+else
+  log "rustup not found, skipping Rust toolchain auto-update"
+fi
+
+if command -v cargo >/dev/null 2>&1; then
+  log "Running cargo update to refresh crate dependencies"
+  (cd "$ROOT_DIR/backend" && cargo update) || log "cargo update failed, continuing with existing Cargo.lock"
+else
+  log "cargo not found, skipping cargo update"
+fi
+
 log "Building backend"
 cd "$ROOT_DIR/backend"
 cargo build --release
 
 log "Building frontend"
 cd "$ROOT_DIR/frontend"
-if [ -f package-lock.json ]; then
-  if ! npm ci --prefer-offline --no-audit; then
-    echo "[w9] npm ci failed (likely lockfile drift). Falling back to npm install..."
-    npm install --prefer-offline --no-audit || {
-      echo "[w9] npm install also failed"
-      exit 1
-    }
-  fi
-else
-  npm install --prefer-offline --no-audit
-fi
+log "Installing npm dependencies (npm install)..."
+npm install --prefer-offline --no-audit || {
+  echo "[w9] npm install failed"
+  exit 1
+}
+
+log "Updating npm packages to latest compatible versions (npm update)..."
+npm update --no-audit || echo "[w9] npm update failed, continuing with installed versions"
+
+log "Running npm audit fix (best-effort)..."
+npm audit fix --force --legacy-peer-deps || echo "[w9] npm audit fix failed or found issues that require manual review"
+
 NEXT_PUBLIC_API_BASE="$NEXT_PUBLIC_API_BASE" \
 NEXT_PUBLIC_MAIL_API_BASE="${NEXT_PUBLIC_MAIL_API_BASE:-${W9_MAIL_API_BASE:-https://w9.nu/api}}" \
 NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}" \
