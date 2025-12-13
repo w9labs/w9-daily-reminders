@@ -59,51 +59,71 @@ W9 Daily Reminders transforms calendar data into actionable daily briefings thro
 - **Security**: Cloudflare Turnstile integration
 
 ### Deployment
-- **Service Management**: Systemd
-- **Reverse Proxy**: Nginx
-- **SSL/TLS**: Self-signed certificates for origin (production uses Cloudflare)
-- **Installation**: Automated `install.sh` script
+- **Containerization**: Docker with multi-stage builds
+- **CI/CD**: GitHub Actions for automated builds
+- **Image Registry**: GitHub Container Registry (GHCR)
+- **Auto-updates**: Watchtower for zero-downtime updates
+- **Reverse Proxy**: Nginx (configured separately)
 
 ## Quick Start
 
 ### Prerequisites
-- Linux-based VPS (tested on Arch Linux)
-- Rust toolchain (installed via `install.sh`)
-- Node.js 18+ and npm (installed via `install.sh`)
-- Nginx (installed via `install.sh`)
-- OpenSSL (for SSL certificate generation)
+- Docker and Docker Compose installed on your VPS
+- GitHub Container Registry (GHCR) access configured
+- Google OAuth credentials (for Calendar integration)
+- Cerebras API key (for AI content generation)
 
-### Installation
+### Docker Deployment
 
-1. **Clone the repository**:
+This project uses **Docker with CI/CD** for deployment. Images are automatically built and pushed to GitHub Container Registry on every push to `main`.
+
+1. **Set up deployment on your VPS:**
+   
+   Clone the repository and configure environment variables:
+   
    ```bash
-   git clone <repository-url>
+   # On your VPS
+   git clone https://github.com/your-username/w9-daily-reminders.git
    cd w9-daily-reminders
+   
+   # Configure environment variables
+   cp .env.example .env
+   nano .env
    ```
 
-2. **Create environment file**:
+2. **Login to GitHub Container Registry (if using private images):**
    ```bash
-   cp env.example .env
-   # Edit .env with your configuration
+   echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
    ```
 
-3. **Run installation script**:
+3. **Deploy with Docker Compose:**
    ```bash
-   chmod +x install.sh
-   sudo ./install.sh
+   # Pull latest images
+   docker-compose pull
+   
+   # Start services
+   docker-compose up -d
    ```
 
-The installation script will:
-- Install Rust and Node.js dependencies
-- Build the backend and frontend
-- Configure systemd service
-- Set up Nginx reverse proxy
+4. **View logs:**
+   ```bash
+   docker-compose logs -f w9-daily-reminders-backend
+   ```
+
+### CI/CD
+
+The project includes a GitHub Actions workflow (`.github/workflows/docker-build.yml`) that:
+- Builds both backend and frontend Docker images on every push to `main`
+- Pushes images to `ghcr.io/<your-username>/w9-daily-reminders-backend` and `w9-daily-reminders-frontend`
+- Tags images with `latest` and commit SHA
+
+**Watchtower** (included in docker-compose.yml) automatically updates containers when new images are pushed.
 - Generate SSL certificates
 - Configure environment variables from `.env`
 
 ### Configuration
 
-Key environment variables (see `env.example` for full list):
+Key environment variables (see `.env.example` for full list):
 
 ```bash
 # API Keys
