@@ -30,11 +30,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Downcase Image Name
+        run: |
+          echo "IMAGE_NAME=${{ env.REGISTRY }}/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/w9-daily-reminders-backend" >> $GITHUB_ENV
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/w9-daily-reminders-backend
+          images: ${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -70,11 +74,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Downcase Image Name
+        run: |
+          echo "IMAGE_NAME=${{ env.REGISTRY }}/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/w9-daily-reminders-frontend" >> $GITHUB_ENV
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/w9-daily-reminders-frontend
+          images: ${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-

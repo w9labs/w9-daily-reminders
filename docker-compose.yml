@@ -6,6 +6,8 @@ services:
     image: ghcr.io/${GITHUB_USER:-your-username}/w9-daily-reminders-backend:latest
     container_name: w9-daily-reminders-backend
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     ports:
       - "${W9_REMINDERS_PORT:-8787}:8787"
     environment:
@@ -41,6 +43,8 @@ services:
     image: ghcr.io/${GITHUB_USER:-your-username}/w9-daily-reminders-frontend:latest
     container_name: w9-daily-reminders-frontend
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     ports:
       - "${W9_REMINDERS_FRONTEND_PORT:-8083}:80"
     networks:
