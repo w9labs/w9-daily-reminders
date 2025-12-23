@@ -1,6 +1,6 @@
 # Multi-stage build for w9-daily-reminders backend
 # Stage 1: Build
-FROM rust:1.75-slim as builder
+FROM rust:1.83-slim AS builder
 
 WORKDIR /build
 

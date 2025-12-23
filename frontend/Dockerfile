@@ -1,6 +1,6 @@
 # Multi-stage build for w9-daily-reminders Next.js frontend
 # Stage 1: Build
-FROM node:20-slim as builder
+FROM node:20-slim AS builder
 
 WORKDIR /build
 
@@ -8,7 +8,7 @@ WORKDIR /build
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm ci --only=production=false
+RUN npm install
 
 # Copy source files
 COPY . .
