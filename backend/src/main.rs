@@ -28,8 +28,9 @@ async fn main() -> anyhow::Result<()> {
     .with(tracing_subscriber::fmt::layer())
     .init();
 
-  let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".into());
-  let store = DataStore::new(data_dir).await?;
+  let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+  let store = DataStore::new(&database_url).await?;
+  
   let mail_api_base = std::env::var("W9_MAIL_API_BASE").unwrap_or_else(|_| "https://w9.nu/api".into());
   let mail_service_token_env =
     std::env::var("W9_MAIL_SERVICE_TOKEN").ok().filter(|value| !value.trim().is_empty());

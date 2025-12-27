@@ -22,3 +22,5 @@ urlencoding = "2.1"
 parking_lot = "0.12"
 base64 = "0.21"
 home = "=0.5.9"
+async-lock = "=3.4.0"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "json", "uuid", "chrono"] }

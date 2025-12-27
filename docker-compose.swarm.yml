@@ -4,7 +4,6 @@ services:
   # W9 Daily Reminders Backend
   w9-daily-reminders-backend:
     image: ghcr.io/${GITHUB_USER:-your-username}/w9-daily-reminders-backend:latest
-    container_name: w9-daily-reminders-backend
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -13,7 +12,6 @@ services:
     environment:
       - PORT=8787
       - DATA_DIR=/app/data
-      - DATABASE_URL=postgres://${POSTGRES_USER:-w9admin}:${POSTGRES_PASSWORD:-securepassword}@${POSTGRES_HOST:-w9-db-postgres}:5432/${POSTGRES_DB:-w9labs}
       - W9_MAIL_API_BASE=${W9_MAIL_API_BASE:-https://w9.nu/api}
       - W9_MAIL_SERVICE_TOKEN=${W9_REMINDERS_MAIL_SERVICE_TOKEN:-}
       - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
@@ -32,7 +30,21 @@ services:
       - w9-reminders-data:/app/data
     networks:
       - w9-reminders-network
-      - w9-network
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      placement:
+        constraints:
+          - node.role == worker
+          # Optional: pin to specific nodes
+          # - node.hostname == vps-8
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8787/api/system/health"]
       interval: 30s
@@ -43,7 +55,6 @@ services:
   # W9 Daily Reminders Frontend
   w9-daily-reminders-frontend:
     image: ghcr.io/${GITHUB_USER:-your-username}/w9-daily-reminders-frontend:latest
-    container_name: w9-daily-reminders-frontend
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -51,14 +62,23 @@ services:
       - "${W9_REMINDERS_FRONTEND_PORT:-8083}:80"
     networks:
       - w9-reminders-network
-      - w9-network
-    depends_on:
-      - w9-daily-reminders-backend
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      placement:
+        constraints:
+          - node.role == worker
 
   # Watchtower - Auto-update containers
   watchtower:
     image: containrrr/watchtower:latest
-    container_name: w9-reminders-watchtower
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -70,7 +90,13 @@ services:
     command: --interval 300 --scope w9-daily-reminders-backend w9-daily-reminders-frontend
     networks:
       - w9-reminders-network
-      - w9-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
 
 volumes:
   w9-reminders-data:
@@ -78,6 +104,5 @@ volumes:
 
 networks:
   w9-reminders-network:
-    driver: bridge
-  w9-network:
-    external: true
+    driver: overlay
+
