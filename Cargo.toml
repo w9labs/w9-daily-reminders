@@ -17,3 +17,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 anyhow = "1"
+
+# Pin time crate to MSRV-compatible version
+time = ">=0.3.20, <0.3.37"
