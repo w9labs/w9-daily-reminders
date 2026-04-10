@@ -1,5 +1,5 @@
 [package]
-name = "w9_daily_reminders-client"
+name = "w9-daily-reminders-client"
 version = "0.1.0"
 edition = "2021"
 
