@@ -1,3 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://reminder.w9.nu/sitemap.xml

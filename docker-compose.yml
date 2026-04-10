@@ -1,61 +1,35 @@
 version: '3.8'
-
 services:
-  # W9 Daily Reminders Backend
-  w9-daily-reminders-backend:
-    image: ghcr.io/${GITHUB_USER:-your-username}/w9-daily-reminders-backend:latest
-    container_name: w9-daily-reminders-backend
+  w9-daily-reminders:
+    image: ghcr.io/${GITHUB_USER:-w9labs}/w9-daily-reminders:latest
+    container_name: w9-daily-reminders
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.w9-reminders.rule=Host(`reminder.w9.nu`)"
+      - "traefik.http.routers.w9-reminders.entrypoints=websecure"
+      - "traefik.http.routers.w9-reminders.tls=true"
+      - "traefik.http.services.w9-reminders.loadbalancer.server.port=8084"
     ports:
-      - "${W9_REMINDERS_PORT:-8787}:8787"
+      - "${W9_REMINDERS_PORT:-8084}:8084"
     environment:
-      - PORT=8787
-      - DATA_DIR=/app/data
-      - DATABASE_URL=postgres://${POSTGRES_USER:-w9admin}:${POSTGRES_PASSWORD:-securepassword}@${POSTGRES_HOST:-w9-db-postgres}:5432/${POSTGRES_DB:-w9labs}
-      - W9_MAIL_API_BASE=${W9_MAIL_API_BASE:-https://w9.nu/api}
-      - W9_MAIL_SERVICE_TOKEN=${W9_REMINDERS_MAIL_SERVICE_TOKEN:-}
-      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-https://reminder.w9.nu/google/callback}
-      - TURNSTILE_SITE_KEY=${W9_REMINDERS_TURNSTILE_SITE_KEY:-}
-      - TURNSTILE_SECRET=${W9_REMINDERS_TURNSTILE_SECRET:-}
-      - POLLINATIONS_API_KEY=${POLLINATIONS_API_KEY:-}
-      - POLLINATIONS_API_BASE=${POLLINATIONS_API_BASE:-https://enter.pollinations.ai}
-      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
-      - CLOUDFLARE_AI_BASE=${CLOUDFLARE_AI_BASE:-https://api.cloudflare.com/client/v4}
-      - RUST_LOG=${W9_REMINDERS_RUST_LOG:-w9_daily_reminders=info,axum=info}
+      - HOST=0.0.0.0
+      - PORT=8084
+      - DATABASE_URL=${DATABASE_URL:-memory}
+      - W9_MAIL_API_URL=${W9_MAIL_API_URL:-https://mail.w9.nu}
+      - W9_MAIL_API_TOKEN=${W9_MAIL_API_TOKEN}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     volumes:
       - w9-reminders-data:/app/data
     networks:
-      - w9-reminders-network
       - w9-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8787/api/system/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-
-  # W9 Daily Reminders Frontend
-  w9-daily-reminders-frontend:
-    image: ghcr.io/${GITHUB_USER:-your-username}/w9-daily-reminders-frontend:latest
-    container_name: w9-daily-reminders-frontend
-    restart: unless-stopped
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-    ports:
-      - "${W9_REMINDERS_FRONTEND_PORT:-8083}:80"
-    networks:
-      - w9-reminders-network
-      - w9-network
-    depends_on:
-      - w9-daily-reminders-backend
-
-  # Watchtower - Auto-update containers
   watchtower:
     image: containrrr/watchtower:latest
     container_name: w9-reminders-watchtower
@@ -65,19 +39,13 @@ services:
     environment:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_POLL_INTERVAL=300
-      - WATCHTOWER_INCLUDE_STOPPED=true
       - WATCHTOWER_LABEL_ENABLE=true
-    command: --interval 300 --scope w9-daily-reminders-backend w9-daily-reminders-frontend
+    command: --interval 300 --scope w9-daily-reminders
     networks:
-      - w9-reminders-network
       - w9-network
-
 volumes:
   w9-reminders-data:
     driver: local
-
 networks:
-  w9-reminders-network:
-    driver: bridge
   w9-network:
     external: true
