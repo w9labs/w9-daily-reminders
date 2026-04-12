@@ -3,8 +3,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y pkg-config libssl-dev libpq-dev && rm -rf /var/lib/apt/lists/*
 COPY Cargo.toml Cargo.lock* ./
 COPY server/Cargo.toml ./server/
-RUN mkdir -p server/src
-RUN echo "fn main(){}" > server/src/main.rs
+COPY server/infra/templates/voxel.css ./server/infra/templates/voxel.css
+RUN mkdir -p server/src && echo "fn main(){}" > server/src/main.rs
 RUN cargo fetch --locked 2>/dev/null || cargo fetch
 COPY server/src ./server/src
 RUN cargo build --release -p w9-daily-reminders-server && cp target/release/w9-daily-reminders-server /usr/local/bin/appserver
