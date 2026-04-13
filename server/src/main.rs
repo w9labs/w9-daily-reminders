@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_postgres::{Client,NoTls};
 use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer,trace::TraceLayer};
+use tower_http::{cors::CorsLayer,trace::TraceLayer,services::ServeDir};
 use tracing_subscriber::{layer::SubscriberExt,util::SubscriberInitExt};
 use uuid::Uuid;
 
@@ -24,7 +24,7 @@ pub struct AppState{
 }
 
 fn layout(t:&str,b:&str,n:&str)->String{
-    format!(r#"<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>{} — W9 Reminders</title><style>{}</style></head><body><div class="app"><nav class="nav"><a href="/" class="brand">⏰ W9 Reminders</a>{}</nav>{}</div></body></html>"#,t,CSS,n,b)
+    format!(r#"<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>{} — W9 Reminders</title><style>{}</style></head><body><div class="app"><nav class="nav"><a href="/" class="brand"><img src="/w9-logo/wordmark-light.svg" alt="W9"/><span>Reminders</span></a>{}</nav>{}</div></body></html>"#,t,CSS,n,b)
 }
 fn pub_layout(t:&str,b:&str)->String{layout(t,b,r#"<a href="/login">Login</a>"#)}
 fn user_layout(t:&str,b:&str)->String{layout(t,b,r#"<a href="/schedules">Schedules</a><a href="/log">Log</a><a href="/logout">Logout</a>"#)}
@@ -42,7 +42,7 @@ async fn verify(a:&AppState,t:&str)->Option<serde_json::Value>{
 async fn require(j:&CookieJar,a:&AppState)->Option<serde_json::Value>{let t=get_s(j)?;verify(a,&t).await}
 
 fn home_html()->String{
-    pub_layout("W9 Reminders",r#"<div class="hero"><h1>⏰ W9 Daily Reminders</h1><p>AI-powered daily email digests from your Google Calendar</p><div class="flex mt-3" style="justify-content:center"><a href="/login" class="btn">Login with W9</a></div></div><div class="grid mt-3"><div class="card"><h3>📅 Google Calendar</h3><p class="text-sm">Connect your Google Calendar for daily event summaries.</p></div><div class="card"><h3>🤖 AI Summaries</h3><p class="text-sm">AI generates personalized daily summaries with images.</p></div><div class="card"><h3>📧 Email Delivery</h3><p class="text-sm">Beautiful HTML emails delivered via W9 Mail every morning.</p></div></div>"#)
+    pub_layout("W9 Reminders",r#"<div class="hero"><img class="hero-logo" src="/w9-logo/hero-transparent.svg" alt="W9 Reminders"/><h1>⏰ W9 Daily Reminders</h1><p>AI-powered daily email digests from your Google Calendar</p><div class="flex mt-3" style="justify-content:center"><a href="/login" class="btn">Login with W9</a></div></div><div class="grid mt-3"><div class="card"><h3>📅 Google Calendar</h3><p class="text-sm">Connect your Google Calendar for daily event summaries.</p></div><div class="card"><h3>🤖 AI Summaries</h3><p class="text-sm">AI generates personalized daily summaries with images.</p></div><div class="card"><h3>📧 Email Delivery</h3><p class="text-sm">Beautiful HTML emails delivered via W9 Mail every morning.</p></div></div>"#)
 }
 fn login_html()->String{
     pub_layout("Login",r#"<div class="card" style="max-width:420px;margin:3rem auto;text-align:center"><h1>⏰ W9 Reminders</h1><p class="text-sm text-muted mb-2">Sign in with W9 DB</p><a href="https://db.w9.nu/oauth/authorize?redirect_uri=https://reminder.w9.nu/oauth/callback&response_type=code&client_id=w9-reminders" class="btn" style="width:100%">Login with W9 DB</a></div>"#)
@@ -127,6 +127,7 @@ async fn main()->anyhow::Result<()>{
     client.query_one("SELECT 1",&[]).await?;
     let state=AppState{db:Arc::new(client),http_client:reqwest::Client::builder().timeout(std::time::Duration::from_secs(10)).build()?,google_id:g_id,mail_api:mail_api,mail_token:mail_tok,ai_key:ai};
     let router=Router::new()
+        .nest_service("/w9-logo", ServeDir::new("public/w9-logo"))
         .route("/",get(home))
         .route("/login",get(login_page))
         .route("/oauth/callback",get(oauth_cb))
