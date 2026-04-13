@@ -24,7 +24,10 @@ pub struct AppState{
 }
 
 fn layout(t:&str,b:&str,n:&str)->String{
-    format!(r#"<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>{} — W9 Reminders</title><style>{}</style></head><body><div class="app"><nav class="nav"><a href="/" class="brand"><img src="/w9-logo/wordmark-light.svg" alt="W9"/><span>Reminders</span></a>{}</nav>{}</div></body></html>"#,t,CSS,n,b)
+    format!(
+r#"<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>{} — W9 Reminders</title><style>{}</style></head><body><div class="app"><nav class="nav"><div class="nav-inner"><a href="/" class="brand"><img src="/w9-logo/wordmark.svg" alt="W9 Labs"/><span class="brand-text">Reminders</span></a><div class="nav-links">{}</div></div></nav><main class="app-main">{}</main><footer class="footer"><img class="footer-logo" src="/w9-logo/wordmark-dark.svg" alt="W9 Labs"/><p>W9 Daily Reminders — AI Calendar Digest</p><p class="text-xs text-muted">Google Calendar + AI + Email</p></footer></div></body></html>"#,
+        t, CSS, n, b
+    )
 }
 fn pub_layout(t:&str,b:&str)->String{layout(t,b,r#"<a href="/login">Login</a>"#)}
 fn user_layout(t:&str,b:&str)->String{layout(t,b,r#"<a href="/schedules">Schedules</a><a href="/log">Log</a><a href="/logout">Logout</a>"#)}
@@ -42,7 +45,7 @@ async fn verify(a:&AppState,t:&str)->Option<serde_json::Value>{
 async fn require(j:&CookieJar,a:&AppState)->Option<serde_json::Value>{let t=get_s(j)?;verify(a,&t).await}
 
 fn home_html()->String{
-    pub_layout("W9 Reminders",r#"<div class="hero"><img class="hero-logo" src="/w9-logo/hero-transparent.svg" alt="W9 Reminders"/><h1>⏰ W9 Daily Reminders</h1><p>AI-powered daily email digests from your Google Calendar</p><div class="flex mt-3" style="justify-content:center"><a href="/login" class="btn">Login with W9</a></div></div><div class="grid mt-3"><div class="card"><h3>📅 Google Calendar</h3><p class="text-sm">Connect your Google Calendar for daily event summaries.</p></div><div class="card"><h3>🤖 AI Summaries</h3><p class="text-sm">AI generates personalized daily summaries with images.</p></div><div class="card"><h3>📧 Email Delivery</h3><p class="text-sm">Beautiful HTML emails delivered via W9 Mail every morning.</p></div></div>"#)
+    pub_layout("W9 Reminders",r#"<div class="hero"><img class="hero-logo" src="/w9-logo/wordmark.svg" alt="W9 Labs"/><h1>W9 Daily Reminders</h1><p class="hero-sub">AI-powered daily email digests from your Google Calendar</p><p class="hero-muted">Never miss a meeting again</p><div class="hero-actions"><a href="/login" class="btn">Login with W9</a></div></div><div class="grid"><div class="card"><h3>📅 Google Calendar</h3><p>Connect your Google Calendar for daily event summaries.</p></div><div class="card"><h3>🤖 AI Summaries</h3><p>AI generates personalized daily summaries with images.</p></div><div class="card"><h3>📧 Email Delivery</h3><p>Beautiful HTML emails delivered via W9 Mail every morning.</p></div></div>"#)
 }
 fn login_html()->String{
     pub_layout("Login",r#"<div class="card" style="max-width:420px;margin:3rem auto;text-align:center"><h1>⏰ W9 Reminders</h1><p class="text-sm text-muted mb-2">Sign in with W9 DB</p><a href="https://db.w9.nu/oauth/authorize?redirect_uri=https://reminder.w9.nu/oauth/callback&response_type=code&client_id=w9-reminders" class="btn" style="width:100%">Login with W9 DB</a></div>"#)
