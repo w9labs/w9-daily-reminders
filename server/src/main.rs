@@ -25,7 +25,7 @@ pub struct AppState{
 
 fn layout(t:&str,b:&str,n:&str)->String{
     format!(
-r#"<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>{} — W9 Reminders</title><style>{}</style></head><body><div class="app"><nav class="nav"><div class="nav-inner"><a href="/" class="brand"><img src="/w9-logo/wordmark.svg" alt="W9 Labs"/><span class="brand-text">Reminders</span></a><div class="nav-links">{}</div></div></nav><main class="app-main">{}</main><footer class="footer"><img class="footer-logo" src="/w9-logo/wordmark-dark.svg" alt="W9 Labs"/><p>W9 Daily Reminders — AI Calendar Digest</p><p class="text-xs text-muted">Google Calendar + AI + Email</p></footer></div></body></html>"#,
+r#"<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>{} — W9 Reminders</title><style>{}</style></head><body><div class="app"><nav class="nav"><div class="nav-inner"><a href="/" class="brand"><img src="/w9-logo/wordmark.svg" alt="W9 Labs"/><span class="brand-text">Reminders</span></a><div class="nav-links">{}</div></div></nav><main class="app-main">{}</main><footer class="footer"><img class="footer-logo" src="/w9-logo/wordmark.svg" alt="W9 Labs"/><p>W9 Daily Reminders — AI Calendar Digest</p><p class="text-xs text-muted">Google Calendar + AI + Email</p></footer></div></body></html>"#,
         t, CSS, n, b
     )
 }
