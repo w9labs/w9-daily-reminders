@@ -11,11 +11,12 @@ RUN cargo build --release -p w9-daily-reminders-server && cp target/release/w9-d
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y curl libssl3 libpq5 ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN useradd -m -s /bin/bash appuser
 COPY --from=server-builder /usr/local/bin/appserver /usr/local/bin/appserver
 COPY public/w9-logo /app/public/w9-logo
 RUN ls -la /app/public/w9-logo/
 WORKDIR /app
-RUN chmod +x /usr/local/bin/appserver
+RUN chown -R appuser:appuser /app && chmod +x /usr/local/bin/appserver
 USER appuser
 EXPOSE 8084
 CMD ["/usr/local/bin/appserver"]
