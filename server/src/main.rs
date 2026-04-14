@@ -427,17 +427,14 @@ async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
         }
     };
     
-    // Send via W9 Mail
+    // Send via W9 Mail (matches w9-db payload format: from_alias + body_html)
     let mail_base = s.mail_api_base.trim_end_matches('/');
-    let sender = "reminder@w9.nu".to_string();
     let to_email = settings.user_email.clone();
     let payload = SendEmailPayload {
-        from: sender,
         to: to_email.clone(),
-        cc: None, bcc: None,
+        from_alias: "reminder@w9.nu".to_string(),
         subject: preview.subject.clone(),
-        body: preview.html.clone(),
-        is_html: true,
+        body_html: preview.html.clone(),
     };
 
     match s.mail_client.send_email(mail_base, W9_MAIL_TOKEN, &payload).await {

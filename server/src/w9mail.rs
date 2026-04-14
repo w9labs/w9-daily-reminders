@@ -150,14 +150,8 @@ pub struct W9MailProfile {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SendEmailPayload {
-    pub from: String,
     pub to: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cc: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bcc: Option<String>,
+    pub from_alias: String,
     pub subject: String,
-    pub body: String,
-    #[serde(rename = "isHtml")]
-    pub is_html: bool,
+    pub body_html: String,
 }
