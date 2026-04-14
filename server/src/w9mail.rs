@@ -102,7 +102,7 @@ impl W9MailClient {
         if base.trim().is_empty() {
             return Err(W9MailError::MissingBase);
         }
-        let url = Self::build_url(base, "/send");
+        let url = Self::build_url(base, "/email/send");
         let resp = self
             .http
             .post(url)

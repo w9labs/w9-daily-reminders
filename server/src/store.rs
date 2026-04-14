@@ -126,8 +126,7 @@ impl DataStore {
         match row {
             Some(r) => {
                 let val: serde_json::Value = r.try_get("settings")?;
-                let mut settings: ReminderSettings = serde_json::from_value(val)?;
-                settings.user_email = email.to_string();
+                let settings: ReminderSettings = serde_json::from_value(val)?;
                 Ok(settings)
             }
             None => {
