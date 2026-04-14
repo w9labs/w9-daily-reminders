@@ -37,7 +37,7 @@ impl NvidiaModel {
 
     pub fn all() -> &'static [(&'static str, &'static str)] {
         &[
-            ("minimaxai/minimax-m2.7", "MiniMax M2.7 (Recommended)"),
+            ("minimaxai/minimax-m2.7", "MiniMax M2.7"),
             ("z-ai/glm4.7", "GLM 4.7"),
         ]
     }

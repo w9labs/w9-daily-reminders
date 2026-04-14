@@ -77,12 +77,8 @@ impl CerebrasClient {
 
     pub fn supported_models() -> Vec<String> {
         vec![
-            "gpt-oss-120b".to_string(),
-            "llama-3.3-70b".to_string(),
-            "llama3.1-8b".to_string(),
             "qwen-3-235b-a22b-instruct-2507".to_string(),
-            "qwen-3-32b".to_string(),
-            "zai-glm-4.6".to_string(),
+            "llama3.1-8b".to_string(),
         ]
     }
 
