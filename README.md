@@ -4,44 +4,75 @@
 
 AI-powered daily briefing system that delivers personalized schedule reminders with intelligent content generation and visual storytelling.
 
-## Tech Stack
-
-- **Backend**: Rust 1.94 + Axum 0.7 + SQLx (PostgreSQL)
-- **Frontend**: Server-rendered HTML (8-bit Voxel Arcade theme)
-- **AI Generation**: Cerebras API (zai-glm-4.6, llama-3.3-70b, qwen-3-235b)
-- **Image Generation**: Pollinations.ai + Cloudflare Workers AI (flux-2-dev, SDXL)
-- **Weather**: Open-Meteo API (free, no API key required)
-- **Calendar**: Google Calendar + Google Tasks OAuth2 integration
-- **Email Delivery**: W9 Mail API (SMTP via lettre)
-- **Database**: PostgreSQL 16 (w9_reminders database)
-- **Authentication**: OAuth 2.0 via w9-db (db.w9.nu)
-- **Deployment**: Docker + Caddy reverse proxy + Cloudflare SSL
-
 ## Features
 
-### Core Functionality
-- **Automated Daily Reminders**: Scheduled email delivery at user-configured times
-- **Google Calendar Integration**: OAuth2-based calendar sync with secure token management
-- **Google Tasks Integration**: Fetch and include tasks in daily briefings
-- **AI-Generated Content**: Context-aware email generation using Cerebras zai-glm-4.6
-- **Dynamic Image Generation**: Pollinations.ai + Cloudflare Workers AI with model selection and caching
-- **Weather Advisories**: Location-based weather insights with practical recommendations (Open-Meteo)
-- **Day/Week Schedule Modes**: Choose between daily view or weekly digest
-- **Timezone Support**: Full IANA timezone database support for global users
-- **Multi-language Support**: Flexible language configuration with custom language support
+### Per-User Isolation
+- **Independent settings** — each user configures their own schedule, timezone, language, AI models
+- **Separate Google OAuth tokens** — per-user Calendar + Tasks sync
+- **Individual preview cache** — generated emails stored per user
+- **Execution logs** — per-user history of sent/failed emails
 
-### User Management & Security
-- **W9 Mail Integration**: Unified authentication and user management via W9 Mail API
-- **OAuth 2.0 via w9-db**: Same auth pattern as all W9 Labs services
-- **Cloudflare Turnstile**: Bot protection on authentication endpoints
-- **Role-Based Access Control**: Admin, developer, and user privilege levels
+### AI Providers (Choice)
+| Provider | Models | Endpoint |
+|----------|--------|----------|
+| **Cerebras** | zai-glm-4.6, llama-3.3-70b, qwen-3-235b | `api.cerebras.ai` |
+| **NVIDIA NIM** | MiniMax M2.7, GLM 4.7 | `integrate.api.nvidia.com` |
 
-### Administrative Features
-- **System Configuration**: Runtime configuration management for mail API and senders
-- **Sender Management**: Configurable daily reminder and no-reply sender selection from W9 Mail accounts/aliases
-- **Test Email Delivery**: Preview and test email functionality for administrators
-- **Health Monitoring**: Real-time system health and scheduler status
-- **Preview Caching**: Generated previews cached and reused for test sends
+### Image Generation
+| Provider | Models |
+|----------|--------|
+| **Pollinations.ai** | flux, gptimage, SDXL variants |
+| **Cloudflare Workers AI** | flux-2-dev, flux-1-schnell, SDXL |
+
+### Weather
+- **Open-Meteo** (free, no API key)
+- 4-hour forecast slices (daily mode) or weekly summary (weekly mode)
+
+### Email Delivery
+- **W9 Mail API** — authenticated HTML email sending
+- Beautiful branded templates with inline CSS
+
+## Architecture
+
+```
+User → HTTPS → Caddy → w9-daily-reminders:8084
+                                         ↓
+                              PostgreSQL (w9_reminders)
+                              ┌─────────────────────────┐
+                              │ user_settings             │
+                              │ ├─ settings (JSONB)      │
+                              │ ├─ google_tokens (JSONB) │
+                              │ └─ last_preview (JSONB)  │
+                              │                           │
+                              │ reminder_execution_log    │
+                              │ system_health             │
+                              └─────────────────────────┘
+                                         ↓
+                        ┌────────────────┼────────────────┐
+                        ↓                ↓                ↓
+                   Cerebras/NVIDIA  Pollinations/CF   W9 Mail API
+                   (AI copy gen)    (image gen)       (email delivery)
+                        ↓                ↓                ↓
+                   Google Calendar/Tasks (OAuth) ← events + tasks
+```
+
+## API Endpoints
+
+### User Routes (requires login)
+- `GET /settings` — Settings page
+- `POST /api/settings` — Save per-user settings
+- `GET /preview` — Preview page
+- `POST /api/reminders/preview` — Generate preview
+- `POST /api/reminders/send` — Send test email to self
+- `GET /system` — System status + execution log
+- `GET /google/connect` — Start Google OAuth
+- `GET /google/callback` — OAuth callback
+
+### Public
+- `GET /` — Homepage
+- `GET /login` — Login via W9 DB
+- `GET /api/system/health` — Health check
+- `GET /api/system/image-models` — Available AI models
 
 ## Quick Start
 
@@ -51,59 +82,17 @@ cargo run --package w9-daily-reminders-server
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection | `postgres://w9_admin:password@w9-postgres:5432/w9_reminders` |
-| `W9_MAIL_API_BASE` | W9 Mail API URL | `https://mail.w9.nu/api` |
-| `W9_MAIL_SERVICE_TOKEN` | W9 Mail service token | (required for email sending) |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | (required for Calendar) |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth secret | (required for Calendar) |
-| `GOOGLE_REDIRECT_URI` | OAuth callback URL | `https://reminder.w9.nu/google/callback` |
-| `CEREBRAS_API_KEY` | Cerebras AI API key | (required for AI generation) |
-| `POLLINATIONS_API_KEY` | Pollinations API key | (required for image generation) |
-| `POLLINATIONS_API_BASE` | Pollinations API base | `https://enter.pollinations.ai` |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID | (optional, for Workers AI) |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token | (optional, for Workers AI) |
-| `CLOUDFLARE_AI_BASE` | Cloudflare AI API base | `https://api.cloudflare.com/client/v4` |
-| `PORT` | Server port | `8084` |
-| `RUST_LOG` | Log level | `w9_daily_reminders=info,axum=info` |
-
-## API Endpoints
-
-### User Endpoints
-- `GET/POST /api/settings` — Get/update reminder settings
-- `POST /api/reminders/preview` — Generate email preview (triggers full pipeline)
-- `POST /api/google/start` — Start Google OAuth flow
-- `POST /api/google/callback` — Handle OAuth callback and store tokens
-
-### Admin Endpoints (requires admin role)
-- `GET/POST /api/system/config` — Get/update system configuration
-- `GET /api/system/senders` — List available W9 Mail senders
-- `GET /api/system/image-models` — List available AI image models
-- `POST /api/reminders/send-test` — Send test email to configured address
-
-### System Endpoints
-- `GET /api/health` — System health status (scheduler, Google connected, next run)
-
-## Architecture
-
-### Email Generation Pipeline
-1. **Fetch Calendar Events**: Google Calendar API OAuth2 token refresh + event listing
-2. **Fetch Tasks**: Google Tasks API listing (filtered by date range)
-3. **Weather Forecast**: Open-Meteo API for location-based 4-hour or weekly forecasts
-4. **AI Copy Generation**: Cerebras API generates JSON with subject, preview, HTML body, text body, and image prompt
-5. **Image Generation**: Pollinations.ai or Cloudflare Workers AI generates hero image from prompt
-6. **Email Assembly**: Build HTML email with W9 branding, header, image, content, footer
-7. **Delivery**: Send via W9 Mail API with configured sender and recipient
-
-### Day vs Week Mode
-- **Day Mode**: Single day events, 4-hour weather slices, all tasks together
-- **Week Mode**: 7-day event listing grouped by day, weekly weather advisory, tasks grouped by due date
+See `.env.example` for full list. Required for production:
+- `DATABASE_URL` — PostgreSQL connection
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth credentials
+- `CEREBRAS_API_KEY` **or** `NVIDIA_API_KEY` — at least one AI provider
+- `POLLINATIONS_API_KEY` **or** `CLOUDFLARE_*` — at least one image provider
+- `W9_MAIL_API_BASE` — W9 Mail API URL
 
 ## Deployment
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 Access at: `https://reminder.w9.nu`

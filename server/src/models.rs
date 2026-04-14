@@ -28,6 +28,10 @@ pub struct ReminderSettings {
     pub schedule_type: ScheduleType,
     #[serde(default = "default_week_start_day")]
     pub week_start_day: WeekStartDay,
+    #[serde(default = "default_ai_provider")]
+    pub ai_provider: AiProvider,
+    #[serde(default)]
+    pub nvidia_model: Option<String>,
 }
 
 fn default_summary_style() -> SummaryStyle {
@@ -75,6 +79,17 @@ pub enum ImageProvider {
     Cloudflare,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AiProvider {
+    Cerebras,
+    Nvidia,
+}
+
+fn default_ai_provider() -> AiProvider {
+    AiProvider::Cerebras
+}
+
 impl Default for ReminderSettings {
     fn default() -> Self {
         Self {
@@ -90,6 +105,8 @@ impl Default for ReminderSettings {
             image_model: None,
             cloudflare_model: None,
             cerebras_model: None,
+            ai_provider: AiProvider::Cerebras,
+            nvidia_model: None,
             summary_style: SummaryStyle::Concise,
             schedule_type: ScheduleType::Day,
             week_start_day: WeekStartDay::Monday,
