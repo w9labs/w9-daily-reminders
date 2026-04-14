@@ -358,11 +358,20 @@ async fn api_settings_get(State(s): State<AppState>, jar: CookieJar) -> impl Int
 async fn api_settings_post(State(s): State<AppState>, jar: CookieJar, Json(payload): Json<ReminderSettings>) -> impl IntoResponse {
     let email = match require_email(&jar, &s).await { Some(e) => e, None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response() };
     let _ = s.store.ensure_user(&email).await;
-    // Use form email for delivery, session email for DB key
-    let mut settings = payload;
-    match s.store.write_settings(&email, &settings).await {
-        Ok(_) => Json(ApiResponse { data: settings }).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+
+    tracing::info!(session_email = %email, form_email = %payload.user_email, ai_provider = ?payload.ai_provider, "Saving user settings");
+
+    match s.store.write_settings(&email, &payload).await {
+        Ok(_) => {
+            // Return the saved settings so UI can confirm
+            let saved = s.store.read_settings(&email).await.unwrap_or(payload.clone());
+            tracing::info!(session_email = %email, saved_email = %saved.user_email, "Settings saved successfully");
+            Json(ApiResponse { data: saved }).into_response()
+        }
+        Err(e) => {
+            tracing::error!(session_email = %email, error = %e, "Failed to save settings");
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+        }
     }
 }
 
@@ -393,14 +402,8 @@ async fn api_generate_preview(State(s): State<AppState>, jar: CookieJar) -> impl
 
 async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
     let email = match require_email(&jar, &s).await { Some(e) => e, None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response() };
-    
-    // Get or generate preview
-    let settings = match s.store.read_settings(&email).await {
-        Ok(st) => st,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
-    };
-    let tokens = s.store.read_google_tokens(&email).await.ok().flatten();
-    
+
+    // Only use cached preview — don't auto-generate (avoids Caddy timeout)
     let preview = match s.store.read_preview(&email).await {
         Ok(Some(cached)) => ReminderPreview {
             subject: cached.subject,
@@ -410,23 +413,15 @@ async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
             image_url: cached.image_url,
             generated_language: cached.generated_language,
         },
-        _ => {
-            // Generate fresh
-            match generate_preview_for_user(&s, &email, settings.clone(), tokens).await {
-                Ok(p) => {
-                    let cache = UserPreviewCache {
-                        subject: p.subject.clone(), html: p.html.clone(), text: p.text.clone(),
-                        weather_advisory: p.weather_advisory.clone(), image_url: p.image_url.clone(),
-                        generated_language: p.generated_language.clone(), generated_at: Utc::now(),
-                    };
-                    let _ = s.store.write_preview(&email, &cache).await;
-                    p
-                }
-                Err(e) => return (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"error": format!("Failed to generate preview: {}", e)}))).into_response(),
-            }
-        }
+        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"No cached preview found. Generate a preview first."}))).into_response(),
     };
-    
+
+    // Load settings to get the user's email for delivery
+    let settings = match s.store.read_settings(&email).await {
+        Ok(st) => st,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    };
+
     // Send via W9 Mail (matches w9-db payload format: from_alias + body_html)
     let mail_base = s.mail_api_base.trim_end_matches('/');
     let to_email = settings.user_email.clone();
@@ -437,13 +432,15 @@ async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
         body_html: preview.html.clone(),
     };
 
+    tracing::info!(to = %to_email, from_alias = "reminder@w9.nu", "Sending email via W9 Mail");
+
     match s.mail_client.send_email(mail_base, W9_MAIL_TOKEN, &payload).await {
         Ok(_) => {
-            let event_count = 0; // We don't have this info easily here
-            let _ = s.store.log_execution(&email, event_count, true, None).await;
+            let _ = s.store.log_execution(&email, 0, true, None).await;
             Json(serde_json::json!({"status": "sent", "to": to_email})).into_response()
         }
         Err(e) => {
+            tracing::error!(error = %e, "Failed to send email via W9 Mail");
             let _ = s.store.log_execution(&email, 0, false, Some(&e.to_string())).await;
             (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"error": e.to_string()}))).into_response()
         }
