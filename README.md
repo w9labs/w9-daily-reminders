@@ -15,8 +15,10 @@ AI-powered daily briefing system that delivers personalized schedule reminders w
 ### AI Providers (Choice)
 | Provider | Models | Endpoint |
 |----------|--------|----------|
-| **Cerebras** | zai-glm-4.6, llama-3.3-70b, qwen-3-235b | `api.cerebras.ai` |
+| **Cerebras** | qwen-3-235b-a22b-instruct-2507, llama3.1-8b, gpt-oss-120b, zai-glm-4.7 | `api.cerebras.ai` |
 | **NVIDIA NIM** | MiniMax M2.7, GLM 4.7 | `integrate.api.nvidia.com` |
+
+> ⚠️ **Cerebras free tier**: `gpt-oss-120b` and `zai-glm-4.7` may return HTTP 402 (payment required) when free tier quota is temporarily restricted by Cerebras. They remain in the model list for when the restriction is lifted. The free API key (`csk-6pndjh...`) works for `qwen-3-235b-a22b-instruct-2507` and `llama3.1-8b`.
 
 ### Image Generation
 | Provider | Models |
