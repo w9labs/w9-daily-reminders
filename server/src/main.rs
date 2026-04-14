@@ -355,13 +355,13 @@ async fn api_settings_get(State(s): State<AppState>, jar: CookieJar) -> impl Int
     }
 }
 
-async fn api_settings_post(State(s): State<AppState>, jar: CookieJar, Json(mut payload): Json<ReminderSettings>) -> impl IntoResponse {
+async fn api_settings_post(State(s): State<AppState>, jar: CookieJar, Json(payload): Json<ReminderSettings>) -> impl IntoResponse {
     let email = match require_email(&jar, &s).await { Some(e) => e, None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response() };
     let _ = s.store.ensure_user(&email).await;
-    // Override email to authenticated user's email (security)
-    payload.user_email = email.clone();
-    match s.store.write_settings(&email, &payload).await {
-        Ok(_) => Json(ApiResponse { data: payload }).into_response(),
+    // Use form email for delivery, session email for DB key
+    let mut settings = payload;
+    match s.store.write_settings(&email, &settings).await {
+        Ok(_) => Json(ApiResponse { data: settings }).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
@@ -430,20 +430,21 @@ async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
     // Send via W9 Mail
     let mail_base = s.mail_api_base.trim_end_matches('/');
     let sender = format!("reminders@w9.nu");
+    let to_email = settings.user_email.clone();
     let payload = SendEmailPayload {
         from: sender,
-        to: email.clone(),
+        to: to_email.clone(),
         cc: None, bcc: None,
         subject: preview.subject.clone(),
         body: preview.html.clone(),
         is_html: true,
     };
-    
+
     match s.mail_client.send_email(mail_base, W9_MAIL_TOKEN, &payload).await {
         Ok(_) => {
             let event_count = 0; // We don't have this info easily here
             let _ = s.store.log_execution(&email, event_count, true, None).await;
-            Json(serde_json::json!({"status": "sent", "to": email})).into_response()
+            Json(serde_json::json!({"status": "sent", "to": to_email})).into_response()
         }
         Err(e) => {
             let _ = s.store.log_execution(&email, 0, false, Some(&e.to_string())).await;

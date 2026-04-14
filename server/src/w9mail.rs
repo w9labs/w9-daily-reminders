@@ -106,7 +106,7 @@ impl W9MailClient {
         let resp = self
             .http
             .post(url)
-            .bearer_auth(token)
+            .header("X-API-Token", token)
             .json(payload)
             .send()
             .await?;
