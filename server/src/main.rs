@@ -9,14 +9,14 @@ mod google;
 mod w9mail;
 
 use axum::{
-    extract::{Form, Query, State},
+    extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
     Json, Router,
 };
 use axum_extra::extract::CookieJar;
-use chrono::{Duration, NaiveTime, Utc};
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -101,18 +101,17 @@ fn user_layout(t: &str, b: &str) -> String {
 // ==================== Session Helpers ====================
 
 fn set_s(j: CookieJar, t: String) -> CookieJar {
-    j.add(
-        axum_extra::extract::cookie::Cookie::build(("w9_rem_session", t))
-            .path("/")
-            .http_only(true)
-            .same_site(axum_extra::extract::cookie::SameSite::Lax)
-            .max_age(time::Duration::days(7))
-            .finish(),
-    )
+    let cookie = axum_extra::extract::cookie::Cookie::build(("w9_rem_session", t))
+        .path("/")
+        .http_only(true)
+        .same_site(axum_extra::extract::cookie::SameSite::Lax)
+        .max_age(time::Duration::days(7))
+        .build();
+    j.add(cookie)
 }
 
 fn clr_s(j: CookieJar) -> CookieJar {
-    j.remove(axum_extra::extract::cookie::Cookie::named("w9_rem_session"))
+    j.remove(axum_extra::extract::cookie::Cookie::from("w9_rem_session"))
 }
 
 fn get_s(j: &CookieJar) -> Option<String> {
