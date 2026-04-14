@@ -177,7 +177,7 @@ document.getElementById('settings-form').addEventListener('submit', async (e) =>
         scheduleType: document.getElementById('schedule_type').value,
     }};
     try {{
-        const res = await fetch('/api/settings', {{ method: 'POST', headers: {{'Content-Type':'application/json'}}, body: JSON.stringify(body) }});
+        const res = await fetch('/api/settings', {{ method: 'POST', credentials: 'include', headers: {{'Content-Type':'application/json'}}, body: JSON.stringify(body) }});
         const data = await res.json();
         if (res.ok) {{ msg.textContent = '✅ Settings saved!'; msg.className = 'mt-1 alert alert--ok'; }}
         else {{ msg.textContent = '❌ ' + (data.error || 'Save failed'); msg.className = 'mt-1 alert alert--err'; }}
