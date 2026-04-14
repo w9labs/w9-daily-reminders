@@ -79,6 +79,8 @@ impl CerebrasClient {
         vec![
             "qwen-3-235b-a22b-instruct-2507".to_string(),
             "llama3.1-8b".to_string(),
+            "gpt-oss-120b".to_string(),
+            "zai-glm-4.7".to_string(),
         ]
     }
 
