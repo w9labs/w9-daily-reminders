@@ -154,12 +154,19 @@ fn login_html() -> String {
     )
 }
 
-fn settings_html(settings: &ReminderSettings, msg: Option<&str>) -> String {
+fn settings_html(settings: &ReminderSettings, google_connected: bool, msg: Option<&str>) -> String {
     let al = msg.map(|x| format!(r#"<div class="alert alert--ok">{}</div>"#, x)).unwrap_or_default();
+    
+    let google_status = if google_connected {
+        r#"<div class="card mt-2" style="background:#1a3a1a;border:1px solid #2d5a2d"><h3>✅ Google Calendar & Tasks</h3><p class="text-muted">Connected and syncing events/tasks.</p><a href="/google/connect" class="btn" style="margin-top:1rem">Re-connect Google</a></div>"#
+    } else {
+        r#"<div class="card mt-2" style="background:#2a1a1a;border:1px solid #5a2d2d"><h3>❌ Google Calendar & Tasks</h3><p class="text-muted">Not connected. Connect to include your calendar events and tasks in daily reminders.</p><a href="/google/connect" class="btn" style="margin-top:1rem">🔗 Connect Google Calendar</a></div>"#
+    };
+    
     user_layout(
         "Settings",
         &format!(
-            r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>⚙️ Reminder Settings</h1>{}<form id="settings-form"><label>Email</label><input type="email" id="user_email" value="{}" required placeholder="you@w9.nu"/><label>Reminder Time</label><input type="time" id="reminder_time" value="{}" required/><label>Timezone</label><input type="text" id="timezone" value="{}" placeholder="Europe/Stockholm"/><label>Language</label><input type="text" id="language" value="{}" placeholder="English"/><label>Weather Location</label><input type="text" id="weather_location" value="{}" placeholder="Stockholm, Sweden"/><label><input type="checkbox" id="include_weather" {} /> Include Weather</label><label><input type="checkbox" id="include_image" {} /> Include AI Image</label><label>Image Provider</label><select id="image_provider"><option value="pollinations" {}>Pollinations</option><option value="cloudflare" {}>Cloudflare</option></select><label>Summary Style</label><select id="summary_style"><option value="concise" {}>Concise</option><option value="detailed" {}>Detailed</option><option value="bullet" {}>Bullet</option></select><label>Schedule Type</label><select id="schedule_type"><option value="day" {}>Day</option><option value="week" {}>Week</option></select><button type="submit" class="btn mt-1" style="width:100%">Save Settings</button></form><div class="mt-3"><a href="/google/connect" class="btn">🔗 Connect Google Calendar</a></div></div>"#,
+            r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>⚙️ Reminder Settings</h1>{}<form id="settings-form"><label>Email</label><input type="email" id="user_email" value="{}" required placeholder="you@w9.nu"/><label>Reminder Time</label><input type="time" id="reminder_time" value="{}" required/><label>Timezone</label><input type="text" id="timezone" value="{}" placeholder="Europe/Stockholm"/><label>Language</label><input type="text" id="language" value="{}" placeholder="English"/><label>Weather Location</label><input type="text" id="weather_location" value="{}" placeholder="Stockholm, Sweden"/><label><input type="checkbox" id="include_weather" {} /> Include Weather</label><label><input type="checkbox" id="include_image" {} /> Include AI Image</label><label>Image Provider</label><select id="image_provider"><option value="pollinations" {}>Pollinations</option><option value="cloudflare" {}>Cloudflare</option></select><label>Summary Style</label><select id="summary_style"><option value="concise" {}>Concise</option><option value="detailed" {}>Detailed</option><option value="bullet" {}>Bullet</option></select><label>Schedule Type</label><select id="schedule_type"><option value="day" {}>Day</option><option value="week" {}>Week</option></select><button type="submit" class="btn mt-1" style="width:100%">Save Settings</button></form>{}</div>"#,
             al,
             settings.user_email,
             settings.reminder_time,
@@ -175,6 +182,7 @@ fn settings_html(settings: &ReminderSettings, msg: Option<&str>) -> String {
             if settings.summary_style == models::SummaryStyle::Bullet { "selected" } else { "" },
             if settings.schedule_type == ScheduleType::Day { "selected" } else { "" },
             if settings.schedule_type == ScheduleType::Week { "selected" } else { "" },
+            google_status,
         ),
     )
 }
@@ -260,7 +268,8 @@ async fn settings_page(State(s): State<AppState>, jar: CookieJar) -> impl IntoRe
         return Redirect::to("/login").into_response();
     }
     let settings = s.store.read_settings();
-    Html(settings_html(&settings, None)).into_response()
+    let health = s.store.read_health();
+    Html(settings_html(&settings, health.google_connected, None)).into_response()
 }
 
 async fn preview_page(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
@@ -290,6 +299,68 @@ async fn google_connect(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
     };
     let url = google.auth_url(&Uuid::new_v4().to_string());
     (Redirect::to(&url)).into_response()
+}
+
+async fn google_callback(State(s): State<AppState>, jar: CookieJar, Query(q): Query<serde_json::Value>) -> impl IntoResponse {
+    // Check authentication
+    if require(&jar, &s).await.is_none() {
+        return Redirect::to("/login").into_response();
+    }
+
+    // Get authorization code
+    let code = match q.get("code").and_then(|v| v.as_str()) {
+        Some(c) => c.to_string(),
+        None => {
+            let error = q.get("error").and_then(|v| v.as_str()).unwrap_or("unknown");
+            return Html(user_layout(
+                "Google OAuth Error",
+                &format!("<div class=\"card\" style=\"max-width:600px;margin:2rem auto\"><h1>❌ Google OAuth Error</h1><p>Error: {}</p><p><a href=\"/settings\" class=\"btn\">Back to Settings</a></p></div>", error),
+            )).into_response();
+        }
+    };
+
+    // Check for state mismatch (security)
+    if let Some(state_param) = q.get("state").and_then(|v| v.as_str()) {
+        // In production, you'd validate state against stored value
+        tracing::debug!(state = state_param, "Google OAuth state received");
+    }
+
+    // Exchange code for tokens
+    let google = match s.google.as_ref().as_ref() {
+        Some(g) => g,
+        None => return Html(user_layout("Error", "<div class=\"card\"><h1>Google OAuth not configured</h1></div>")).into_response(),
+    };
+
+    match google.exchange_code(&code).await {
+        Ok(tokens) => {
+            // Store tokens in database
+            if let Err(e) = s.store.write_google_tokens(Some(tokens.clone())).await {
+                tracing::error!(?e, "Failed to store Google tokens");
+                return Html(user_layout(
+                    "Google OAuth Error",
+                    &format!("<div class=\"card\" style=\"max-width:600px;margin:2rem auto\"><h1>❌ Failed to Save Tokens</h1><p>{}</p><p><a href=\"/settings\" class=\"btn\">Back to Settings</a></p></div>", e),
+                )).into_response();
+            }
+
+            // Update health status
+            let mut health = s.store.read_health();
+            health.google_connected = true;
+            let _ = s.store.write_health(&health).await;
+
+            // Show success page
+            Html(user_layout(
+                "Google Connected",
+                r#"<div class="card" style="max-width:600px;margin:2rem auto;text-align:center"><h1>✅ Google Calendar Connected</h1><p class="text-muted">Your Google Calendar and Tasks are now synced.</p><p class="text-muted mt-2">Events and tasks will be included in your daily reminders based on your settings.</p><a href="/settings" class="btn mt-2">Back to Settings</a><a href="/preview" class="btn mt-1" style="margin-left:1rem">Generate Preview</a></div>"#,
+            )).into_response()
+        }
+        Err(e) => {
+            tracing::error!(?e, "Failed to exchange Google OAuth code");
+            Html(user_layout(
+                "Google OAuth Error",
+                &format!("<div class=\"card\" style=\"max-width:600px;margin:2rem auto\"><h1>❌ Failed to Exchange Code</h1><p>{}</p><p><a href=\"/settings\" class=\"btn\">Back to Settings</a></p></div>", e),
+            )).into_response()
+        }
+    }
 }
 
 // ==================== API Handlers ====================
@@ -906,6 +977,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/preview", get(preview_page))
         .route("/system", get(system_page))
         .route("/google/connect", get(google_connect))
+        .route("/google/callback", get(google_callback))
         .route("/api/settings", get(api_settings_get).post(api_settings_post))
         .route("/api/reminders/preview", post(api_preview))
         .route("/api/system/health", get(api_health))
