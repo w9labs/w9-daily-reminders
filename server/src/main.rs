@@ -224,7 +224,7 @@ document.getElementById('gen-btn').addEventListener('click', async () => {{
     msg.textContent = 'Generating preview... This may take 30-60s';
     msg.className = 'mt-1';
     try {{
-        const res = await fetch('/api/reminders/preview', {{ method: 'POST', headers: {{'Content-Type':'application/json'}} }});
+        const res = await fetch('/api/reminders/preview', {{ method: 'POST', credentials: 'include', headers: {{'Content-Type':'application/json'}} }});
         const data = await res.json();
         if (res.ok) {{
             msg.textContent = '✅ Preview generated! Reloading...';
@@ -241,7 +241,7 @@ document.getElementById('send-btn').addEventListener('click', async () => {{
     msg.textContent = 'Sending email...';
     msg.className = 'mt-1';
     try {{
-        const res = await fetch('/api/reminders/send', {{ method: 'POST', headers: {{'Content-Type':'application/json'}} }});
+        const res = await fetch('/api/reminders/send', {{ method: 'POST', credentials: 'include', headers: {{'Content-Type':'application/json'}} }});
         const data = await res.json();
         if (res.ok) {{ msg.textContent = '✅ Email sent to ' + (data.to || 'your address'); msg.className = 'mt-1 alert alert--ok'; }}
         else {{ msg.textContent = '❌ ' + (data.error || 'Send failed'); msg.className = 'mt-1 alert alert--err'; }}
@@ -429,7 +429,7 @@ async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
     
     // Send via W9 Mail
     let mail_base = s.mail_api_base.trim_end_matches('/');
-    let sender = format!("reminders@w9.nu");
+    let sender = "reminder@w9.nu".to_string();
     let to_email = settings.user_email.clone();
     let payload = SendEmailPayload {
         from: sender,
