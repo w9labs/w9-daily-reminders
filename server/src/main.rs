@@ -154,7 +154,36 @@ fn settings_html(settings: &ReminderSettings, google_connected: bool, ai_models:
     }).collect::<Vec<_>>().join("");
 
     user_layout("Settings", &format!(
-        r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>⚙️ Reminder Settings</h1>{}<form id="settings-form"><label>Email</label><input type="email" id="user_email" value="{}" required placeholder="you@w9.nu"/><label>Reminder Time</label><input type="time" id="reminder_time" value="{}" required/><label>Timezone</label><input type="text" id="timezone" value="{}" placeholder="Europe/Stockholm"/><label>Language</label><input type="text" id="language" value="{}" placeholder="English"/><label>Weather Location</label><input type="text" id="weather_location" value="{}" placeholder="Stockholm, Sweden"/><label><input type="checkbox" id="include_weather" {} /> Include Weather</label><label><input type="checkbox" id="include_image" {} /> Include AI Image</label><label>Image Provider</label><select id="image_provider"><option value="pollinations" {}>Pollinations</option><option value="cloudflare" {}>Cloudflare</option></select><label>AI Provider</label><div style="display:flex;gap:1rem;margin:0.5rem 0">{}</div><label>Cerebras Model</label><select id="cerebras_model">{}</select><label>NVIDIA Model</label><select id="nvidia_model">{}</select><label>Summary Style</label><select id="summary_style"><option value="concise" {}>Concise</option><option value="detailed" {}>Detailed</option><option value="bullet" {}>Bullet</option></select><label>Schedule Type</label><select id="schedule_type"><option value="day" {}>Day</option><option value="week" {}>Week</option></select><button type="submit" class="btn mt-1" style="width:100%">Save Settings</button></form>{}</div>"#,
+        r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>⚙️ Reminder Settings</h1>{}<form id="settings-form"><label>Email</label><input type="email" id="user_email" value="{}" required placeholder="you@w9.nu"/><label>Reminder Time</label><input type="time" id="reminder_time" value="{}" required/><label>Timezone</label><input type="text" id="timezone" value="{}" placeholder="Europe/Stockholm"/><label>Language</label><input type="text" id="language" value="{}" placeholder="English"/><label>Weather Location</label><input type="text" id="weather_location" value="{}" placeholder="Stockholm, Sweden"/><label><input type="checkbox" id="include_weather" {} /> Include Weather</label><label><input type="checkbox" id="include_image" {} /> Include AI Image</label><label>Image Provider</label><select id="image_provider"><option value="pollinations" {}>Pollinations</option><option value="cloudflare" {}>Cloudflare</option></select><label>AI Provider</label><div style="display:flex;gap:1rem;margin:0.5rem 0">{}</div><label>Cerebras Model</label><select id="cerebras_model">{}</select><label>NVIDIA Model</label><select id="nvidia_model">{}</select><label>Summary Style</label><select id="summary_style"><option value="concise" {}>Concise</option><option value="detailed" {}>Detailed</option><option value="bullet" {}>Bullet</option></select><label>Schedule Type</label><select id="schedule_type"><option value="day" {}>Day</option><option value="week" {}>Week</option></select><button type="submit" class="btn mt-1" style="width:100%">Save Settings</button></form><div id="settings-msg" class="mt-1"></div>{}</div><script>
+document.getElementById('settings-form').addEventListener('submit', async (e) => {{
+    e.preventDefault();
+    const msg = document.getElementById('settings-msg');
+    msg.textContent = 'Saving...';
+    msg.className = 'mt-1';
+    const aiProvider = document.querySelector('input[name="ai_provider"]:checked')?.value || 'cerebras';
+    const body = {{
+        userEmail: document.getElementById('user_email').value,
+        reminderTime: document.getElementById('reminder_time').value,
+        timezone: document.getElementById('timezone').value,
+        language: document.getElementById('language').value,
+        weatherLocation: document.getElementById('weather_location').value,
+        includeWeather: document.getElementById('include_weather').checked,
+        includeImage: document.getElementById('include_image').checked,
+        imageProvider: document.getElementById('image_provider').value,
+        aiProvider: aiProvider,
+        cerebrasModel: document.getElementById('cerebras_model').value || undefined,
+        nvidiaModel: document.getElementById('nvidia_model').value || undefined,
+        summaryStyle: document.getElementById('summary_style').value,
+        scheduleType: document.getElementById('schedule_type').value,
+    }};
+    try {{
+        const res = await fetch('/api/settings', {{ method: 'POST', headers: {{'Content-Type':'application/json'}}, body: JSON.stringify(body) }});
+        const data = await res.json();
+        if (res.ok) {{ msg.textContent = '✅ Settings saved!'; msg.className = 'mt-1 alert alert--ok'; }}
+        else {{ msg.textContent = '❌ ' + (data.error || 'Save failed'); msg.className = 'mt-1 alert alert--err'; }}
+    }} catch(err) {{ msg.textContent = '❌ Network error'; msg.className = 'mt-1 alert alert--err'; }}
+}});
+</script>"#,
         al, settings.user_email, settings.reminder_time, settings.timezone, settings.language,
         settings.weather_location,
         if settings.include_weather { "checked" } else { "" },
@@ -189,7 +218,36 @@ fn preview_html(preview: Option<&UserPreviewCache>) -> String {
         ),
         None => r#"<div class="card"><h2>No preview generated yet</h2><p>Click "Generate Preview" to create your daily reminder.</p></div>"#.to_string(),
     };
-    user_layout("Preview", &format!(r#"<div style="max-width:800px;margin:2rem auto"><h1>📧 Email Preview</h1><form id="preview-form"><button type="submit" class="btn">Generate Preview</button></form><form id="send-form" class="mt-1"><button type="submit" class="btn" style="background:#2d5a2d">Send Test Email</button></form>{}</div>"#, content))
+    user_layout("Preview", &format!(r#"<div style="max-width:800px;margin:2rem auto"><h1>📧 Email Preview</h1><div style="display:flex;gap:1rem"><button id="gen-btn" class="btn">Generate Preview</button><button id="send-btn" class="btn" style="background:#2d5a2d">Send Test Email</button></div><div id="preview-msg" class="mt-1"></div>{}</div><script>
+document.getElementById('gen-btn').addEventListener('click', async () => {{
+    const msg = document.getElementById('preview-msg');
+    msg.textContent = 'Generating preview... This may take 30-60s';
+    msg.className = 'mt-1';
+    try {{
+        const res = await fetch('/api/reminders/preview', {{ method: 'POST', headers: {{'Content-Type':'application/json'}} }});
+        const data = await res.json();
+        if (res.ok) {{
+            msg.textContent = '✅ Preview generated! Reloading...';
+            msg.className = 'mt-1 alert alert--ok';
+            setTimeout(() => window.location.reload(), 1500);
+        }} else {{
+            msg.textContent = '❌ ' + (data.error || 'Generation failed');
+            msg.className = 'mt-1 alert alert--err';
+        }}
+    }} catch(err) {{ msg.textContent = '❌ Network error'; msg.className = 'mt-1 alert alert--err'; }}
+}});
+document.getElementById('send-btn').addEventListener('click', async () => {{
+    const msg = document.getElementById('preview-msg');
+    msg.textContent = 'Sending email...';
+    msg.className = 'mt-1';
+    try {{
+        const res = await fetch('/api/reminders/send', {{ method: 'POST', headers: {{'Content-Type':'application/json'}} }});
+        const data = await res.json();
+        if (res.ok) {{ msg.textContent = '✅ Email sent to ' + (data.to || 'your address'); msg.className = 'mt-1 alert alert--ok'; }}
+        else {{ msg.textContent = '❌ ' + (data.error || 'Send failed'); msg.className = 'mt-1 alert alert--err'; }}
+    }} catch(err) {{ msg.textContent = '❌ Network error'; msg.className = 'mt-1 alert alert--err'; }}
+}});
+</script>"#, content))
 }
 
 fn system_html(health: &HealthStatus, log: &[ExecutionLogEntry]) -> String {
