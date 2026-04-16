@@ -45,9 +45,12 @@ pub struct CloudflareAiClient {
 
 impl CloudflareAiClient {
     pub fn new() -> Result<Self, CloudflareAiError> {
-        let account_id = std::env::var("CLOUDFLARE_ACCOUNT_ID").map_err(|_| CloudflareAiError::MissingAccountId)?;
-        let api_token = std::env::var("CLOUDFLARE_API_TOKEN").map_err(|_| CloudflareAiError::MissingApiToken)?;
-        let api_base = std::env::var("CLOUDFLARE_AI_BASE").unwrap_or_else(|_| "https://api.cloudflare.com/client/v4".into());
+        let account_id = std::env::var("CLOUDFLARE_ACCOUNT_ID")
+            .map_err(|_| CloudflareAiError::MissingAccountId)?;
+        let api_token = std::env::var("CLOUDFLARE_API_TOKEN")
+            .map_err(|_| CloudflareAiError::MissingApiToken)?;
+        let api_base = std::env::var("CLOUDFLARE_AI_BASE")
+            .unwrap_or_else(|_| "https://api.cloudflare.com/client/v4".into());
 
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(60))
@@ -65,8 +68,14 @@ impl CloudflareAiClient {
         CLOUDFLARE_MODELS.iter().map(|m| m.to_string()).collect()
     }
 
-    pub async fn generate(&self, prompt: &str, model: Option<&str>) -> Result<String, CloudflareAiError> {
-        let model_name = model.filter(|m| !m.is_empty()).unwrap_or(CLOUDFLARE_MODELS[0]);
+    pub async fn generate(
+        &self,
+        prompt: &str,
+        model: Option<&str>,
+    ) -> Result<String, CloudflareAiError> {
+        let model_name = model
+            .filter(|m| !m.is_empty())
+            .unwrap_or(CLOUDFLARE_MODELS[0]);
         if MASK_REQUIRED_MODELS.contains(&model_name) {
             return Err(CloudflareAiError::UnsupportedModel(format!(
                 "{} requires mask/image inputs which are not supported in this workflow",
@@ -83,7 +92,8 @@ impl CloudflareAiClient {
         let body = build_payload(model_name, prompt);
 
         let mut request = self.http.post(&url).json(&body);
-        let mut token_header = HeaderValue::from_str(&format!("Bearer {}", self.api_token)).map_err(|err| CloudflareAiError::Api(err.to_string()))?;
+        let mut token_header = HeaderValue::from_str(&format!("Bearer {}", self.api_token))
+            .map_err(|err| CloudflareAiError::Api(err.to_string()))?;
         token_header.set_sensitive(true);
         request = request.header(AUTHORIZATION, token_header);
 
@@ -91,7 +101,10 @@ impl CloudflareAiClient {
         let status = response.status();
         if !status.is_success() {
             let body_text = response.text().await.unwrap_or_default();
-            return Err(CloudflareAiError::Api(format!("HTTP {}: {}", status, body_text)));
+            return Err(CloudflareAiError::Api(format!(
+                "HTTP {}: {}",
+                status, body_text
+            )));
         }
 
         let content_type = response
@@ -113,7 +126,11 @@ impl CloudflareAiClient {
         }
 
         let bytes = response.bytes().await?;
-        let mime = if content_type.is_empty() { "image/jpeg" } else { content_type.as_str() };
+        let mime = if content_type.is_empty() {
+            "image/jpeg"
+        } else {
+            content_type.as_str()
+        };
         let encoded = Base64.encode(bytes);
         Ok(format!("data:{};base64,{}", mime, encoded))
     }
@@ -151,12 +168,14 @@ fn build_payload(model: &str, prompt: &str) -> serde_json::Value {
             "strength": 0.9,
             "seed": seed,
         }),
-        "@cf/black-forest-labs/flux-2-dev" | "@cf/black-forest-labs/flux-1-schnell" => serde_json::json!({
-            "prompt": prompt,
-            "width": 1024,
-            "height": 256,
-            "seed": seed,
-        }),
+        "@cf/black-forest-labs/flux-2-dev" | "@cf/black-forest-labs/flux-1-schnell" => {
+            serde_json::json!({
+                "prompt": prompt,
+                "width": 1024,
+                "height": 256,
+                "seed": seed,
+            })
+        }
         _ => serde_json::json!({ "prompt": prompt }),
     }
 }

@@ -121,10 +121,10 @@ impl CerebrasClient {
         match model {
             "gpt-oss-120b" => {
                 req["reasoning_effort"] = serde_json::json!("low");
-            },
+            }
             "zai-glm-4.6" => {
                 req["disable_reasoning"] = serde_json::json!(true);
-            },
+            }
             _ => {}
         }
 
@@ -144,7 +144,9 @@ impl CerebrasClient {
                 Err(e) => {
                     tracing::warn!(?e, attempt, "cerebras request failed");
                     last_error = CerebrasError::Request(e);
-                    if attempt < 3 { continue; }
+                    if attempt < 3 {
+                        continue;
+                    }
                     break;
                 }
             };
@@ -155,7 +157,9 @@ impl CerebrasClient {
                 Err(e) => {
                     tracing::warn!(?e, attempt, "failed to read response text");
                     last_error = CerebrasError::Request(e);
-                    if attempt < 3 { continue; }
+                    if attempt < 3 {
+                        continue;
+                    }
                     break;
                 }
             };
@@ -171,7 +175,11 @@ impl CerebrasClient {
                 }
 
                 if attempt < 3 {
-                    let delay_ms = if attempt == 1 { 2000 + (attempt as u64 * 500) } else { 5000 + (attempt as u64 * 1000) };
+                    let delay_ms = if attempt == 1 {
+                        2000 + (attempt as u64 * 500)
+                    } else {
+                        5000 + (attempt as u64 * 1000)
+                    };
                     tracing::debug!(delay_ms, attempt, "waiting before retry");
                     tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
                     continue;
@@ -184,25 +192,45 @@ impl CerebrasClient {
                 Err(err) => {
                     tracing::error!(body = %resp_text, error = ?err, attempt, "failed to parse Cerebras response wrapper");
                     last_error = CerebrasError::Invalid("failed to parse Cerebras response".into());
-                    if attempt < 3 { continue; }
+                    if attempt < 3 {
+                        continue;
+                    }
                     break;
                 }
             };
 
             if let Some(err) = resp.error.as_ref() {
-                last_error = CerebrasError::Api(err.message.clone().unwrap_or_else(|| "unknown Cerebras error".into()));
-                if attempt < 3 { continue; }
+                last_error = CerebrasError::Api(
+                    err.message
+                        .clone()
+                        .unwrap_or_else(|| "unknown Cerebras error".into()),
+                );
+                if attempt < 3 {
+                    continue;
+                }
                 break;
             }
 
-            let content = match resp.choices.first().and_then(|choice| {
-                choice.message.content.as_ref().or_else(|| choice.message.reasoning.as_ref())
-            }).filter(|text| !text.trim().is_empty()) {
+            let content = match resp
+                .choices
+                .first()
+                .and_then(|choice| {
+                    choice
+                        .message
+                        .content
+                        .as_ref()
+                        .or_else(|| choice.message.reasoning.as_ref())
+                })
+                .filter(|text| !text.trim().is_empty())
+            {
                 Some(c) => c,
                 None => {
                     tracing::error!(body = %resp_text, attempt, "Cerebras response missing textual content");
-                    last_error = CerebrasError::Invalid("missing textual content in response".into());
-                    if attempt < 3 { continue; }
+                    last_error =
+                        CerebrasError::Invalid("missing textual content in response".into());
+                    if attempt < 3 {
+                        continue;
+                    }
                     break;
                 }
             };
@@ -219,7 +247,9 @@ impl CerebrasClient {
                         }
                     }
                     last_error = e;
-                    if attempt < 3 { continue; }
+                    if attempt < 3 {
+                        continue;
+                    }
                     break;
                 }
             }
@@ -229,13 +259,21 @@ impl CerebrasClient {
     }
 }
 
-fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[Todo], weather: Option<&str>) -> String {
+fn build_prompt(
+    settings: &ReminderSettings,
+    events: &[CalendarEvent],
+    todos: &[Todo],
+    weather: Option<&str>,
+) -> String {
     use crate::models::{ScheduleType, WeekStartDay};
 
     let mut prompt = String::new();
     prompt.push_str("Generate AI reminder email copy for W9 brand. JSON only.\n");
     prompt.push_str(&format!("Language: {}\n", resolve_language(settings)));
-    prompt.push_str(&format!("Summary style: {}\n", summary_style_label(&settings.summary_style)));
+    prompt.push_str(&format!(
+        "Summary style: {}\n",
+        summary_style_label(&settings.summary_style)
+    ));
 
     match settings.schedule_type {
         ScheduleType::Day => {
@@ -246,7 +284,10 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
                 WeekStartDay::Monday => "Monday",
                 WeekStartDay::Sunday => "Sunday",
             };
-            prompt.push_str(&format!("Schedule type: Weekly (starting on {})\n", week_start));
+            prompt.push_str(&format!(
+                "Schedule type: Weekly (starting on {})\n",
+                week_start
+            ));
         }
     }
 
@@ -255,12 +296,18 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
     prompt.push_str("\nFor EVENTS:\n");
     prompt.push_str("- Group events by day (for weekly) or time (for daily)\n");
     prompt.push_str("- Use <p><strong>Day/Time</strong></p> for section headers\n");
-    prompt.push_str("- Use <ul><li>Event title from HH:MM to HH:MM at Location</li></ul> for event lists\n");
+    prompt.push_str(
+        "- Use <ul><li>Event title from HH:MM to HH:MM at Location</li></ul> for event lists\n",
+    );
     prompt.push_str("\nFor TASKS (from Google Tasks):\n");
     prompt.push_str("- Use <p><strong>Tasks</strong></p> as a section header\n");
     prompt.push_str("- Group tasks by due date for weekly mode (use <p><strong>Tasks - Day, Date</strong></p> for each day)\n");
-    prompt.push_str("- For daily mode, list all tasks together under <p><strong>Tasks</strong></p>\n");
-    prompt.push_str("- Format each task as: <li>Task title <em>(due: HH:MM)</em></li> if it has a due date\n");
+    prompt.push_str(
+        "- For daily mode, list all tasks together under <p><strong>Tasks</strong></p>\n",
+    );
+    prompt.push_str(
+        "- Format each task as: <li>Task title <em>(due: HH:MM)</em></li> if it has a due date\n",
+    );
     prompt.push_str("- Format each task as: <li>Task title</li> if it has no due date\n");
     prompt.push_str("- If a task has notes, add them on the same line: <li>Task title <em>(due: HH:MM)</em> — Note text</li>\n");
     prompt.push_str("- Use <ul><li>...</li></ul> for task lists\n");
@@ -282,7 +329,9 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
             let end = event.end.with_timezone(&tz);
             let event_date = start.date_naive();
 
-            if matches!(settings.schedule_type, ScheduleType::Week) && current_date != Some(event_date) {
+            if matches!(settings.schedule_type, ScheduleType::Week)
+                && current_date != Some(event_date)
+            {
                 current_date = Some(event_date);
                 let weekday = start.weekday();
                 prompt.push_str(&format!("\n{} {}:\n", weekday, event_date.format("%B %d")));
@@ -311,7 +360,11 @@ fn build_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[
                     if current_task_date != Some(task_date) {
                         current_task_date = Some(task_date);
                         let weekday = due_local.weekday();
-                        prompt.push_str(&format!("\n{} {} - Tasks:\n", weekday, task_date.format("%B %d")));
+                        prompt.push_str(&format!(
+                            "\n{} {} - Tasks:\n",
+                            weekday,
+                            task_date.format("%B %d")
+                        ));
                     }
                 } else if !has_no_due_tasks {
                     has_no_due_tasks = true;
@@ -380,11 +433,15 @@ fn extract_json_from_text(text: &str) -> Result<String, CerebrasError> {
         }
         return Err(CerebrasError::Invalid("incomplete JSON response".into()));
     }
-    Err(CerebrasError::Invalid("no JSON object found in response".into()))
+    Err(CerebrasError::Invalid(
+        "no JSON object found in response".into(),
+    ))
 }
 
 fn repair_truncated_json(text: &str) -> Result<String, CerebrasError> {
-    let start = text.find('{').ok_or_else(|| CerebrasError::Invalid("no JSON start found".into()))?;
+    let start = text
+        .find('{')
+        .ok_or_else(|| CerebrasError::Invalid("no JSON start found".into()))?;
     let working = text[start..].to_string();
 
     let suffixes = ["}", "\"}", "\"]}", "\"]\"}"];
@@ -396,7 +453,9 @@ fn repair_truncated_json(text: &str) -> Result<String, CerebrasError> {
         }
     }
 
-    Err(CerebrasError::Invalid("could not repair truncated JSON".into()))
+    Err(CerebrasError::Invalid(
+        "could not repair truncated JSON".into(),
+    ))
 }
 
 fn sanitize_control_chars(input: &str) -> String {
@@ -423,7 +482,7 @@ fn sanitize_control_chars(input: &str) -> String {
                 '\n' => sanitized.push_str("\\n"),
                 '\r' => sanitized.push_str("\\r"),
                 '\t' => sanitized.push_str("\\t"),
-                c if c.is_control() => {},
+                c if c.is_control() => {}
                 _ => sanitized.push(ch),
             }
         } else {

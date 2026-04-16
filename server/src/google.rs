@@ -26,9 +26,12 @@ pub struct GoogleClient {
 
 impl GoogleClient {
     pub fn new() -> Result<Self, GoogleError> {
-        let client_id = std::env::var("GOOGLE_CLIENT_ID").map_err(|_| GoogleError::MissingConfig)?;
-        let client_secret = std::env::var("GOOGLE_CLIENT_SECRET").map_err(|_| GoogleError::MissingConfig)?;
-        let redirect_uri = std::env::var("GOOGLE_REDIRECT_URI").map_err(|_| GoogleError::MissingConfig)?;
+        let client_id =
+            std::env::var("GOOGLE_CLIENT_ID").map_err(|_| GoogleError::MissingConfig)?;
+        let client_secret =
+            std::env::var("GOOGLE_CLIENT_SECRET").map_err(|_| GoogleError::MissingConfig)?;
+        let redirect_uri =
+            std::env::var("GOOGLE_REDIRECT_URI").map_err(|_| GoogleError::MissingConfig)?;
         Ok(Self {
             http: reqwest::Client::new(),
             client_id,
@@ -49,22 +52,30 @@ impl GoogleClient {
     }
 
     pub async fn exchange_code(&self, code: &str) -> Result<GoogleTokens, GoogleError> {
-        self.request_tokens(&serde_json::json!({
-            "code": code,
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "redirect_uri": self.redirect_uri,
-            "grant_type": "authorization_code",
-        }), None).await
+        self.request_tokens(
+            &serde_json::json!({
+                "code": code,
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "redirect_uri": self.redirect_uri,
+                "grant_type": "authorization_code",
+            }),
+            None,
+        )
+        .await
     }
 
     pub async fn refresh_tokens(&self, refresh_token: &str) -> Result<GoogleTokens, GoogleError> {
-        self.request_tokens(&serde_json::json!({
-            "refresh_token": refresh_token,
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "grant_type": "refresh_token",
-        }), Some(refresh_token.to_string())).await
+        self.request_tokens(
+            &serde_json::json!({
+                "refresh_token": refresh_token,
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "grant_type": "refresh_token",
+            }),
+            Some(refresh_token.to_string()),
+        )
+        .await
     }
 
     pub async fn list_events(
@@ -95,7 +106,11 @@ impl GoogleClient {
             .json()
             .await?;
 
-        let events = resp.items.into_iter().filter_map(|item| parse_event(item).ok()).collect();
+        let events = resp
+            .items
+            .into_iter()
+            .filter_map(|item| parse_event(item).ok())
+            .collect();
         Ok((events, updated_tokens))
     }
 
@@ -183,7 +198,10 @@ impl GoogleClient {
             .json()
             .await?;
 
-        let refresh = resp.refresh_token.or(existing_refresh).ok_or(GoogleError::Invalid("refresh_token"))?;
+        let refresh = resp
+            .refresh_token
+            .or(existing_refresh)
+            .ok_or(GoogleError::Invalid("refresh_token"))?;
         let ttl = (resp.expires_in - 30).max(60);
         Ok(GoogleTokens {
             access_token: resp.access_token,

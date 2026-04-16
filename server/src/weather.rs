@@ -74,7 +74,14 @@ impl WeatherClient {
         let url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,weather_code"
         );
-        let resp: ForecastResponse = self.http.get(url).send().await?.error_for_status()?.json().await?;
+        let resp: ForecastResponse = self
+            .http
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         let c = resp.current.ok_or(WeatherError::Geocoding)?;
         let mut message = format!(
             "Weather · {resolved}: {temp:.0}°C (feels {feels:.0}°C) · wind {wind:.0} m/s",
@@ -101,15 +108,28 @@ impl WeatherClient {
         Ok(message)
     }
 
-    pub async fn day_forecast_4h(&self, location: &str, target_date: DateTime<Utc>) -> Result<String, WeatherError> {
+    pub async fn day_forecast_4h(
+        &self,
+        location: &str,
+        target_date: DateTime<Utc>,
+    ) -> Result<String, WeatherError> {
         let (lat, lon, resolved) = self.resolve_location(location).await?;
         let start = target_date.format("%Y-%m-%d").to_string();
-        let end = (target_date + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let end = (target_date + chrono::Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string();
 
         let url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,apparent_temperature,wind_speed_10m,weather_code&start_date={start}&end_date={end}"
         );
-        let resp: ForecastResponse = self.http.get(url).send().await?.error_for_status()?.json().await?;
+        let resp: ForecastResponse = self
+            .http
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
 
         let hourly = resp.hourly.ok_or(WeatherError::Geocoding)?;
         let mut forecasts = Vec::new();
@@ -147,31 +167,55 @@ impl WeatherClient {
 
                     forecasts.push(format!(
                         "{:02}:00 · {:.0}°C (feels {:.0}°C){note}",
-                        hour, temp, feels, note = note_str
+                        hour,
+                        temp,
+                        feels,
+                        note = note_str
                     ));
                 }
             }
         }
 
-        Ok(format!("Weather · {} · {}", resolved, forecasts.join(" · ")))
+        Ok(format!(
+            "Weather · {} · {}",
+            resolved,
+            forecasts.join(" · ")
+        ))
     }
 
-    pub async fn week_forecast(&self, location: &str, week_start: DateTime<Utc>) -> Result<String, WeatherError> {
+    pub async fn week_forecast(
+        &self,
+        location: &str,
+        week_start: DateTime<Utc>,
+    ) -> Result<String, WeatherError> {
         let (lat, lon, resolved) = self.resolve_location(location).await?;
         let start = week_start.format("%Y-%m-%d").to_string();
-        let end = (week_start + chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+        let end = (week_start + chrono::Duration::days(7))
+            .format("%Y-%m-%d")
+            .to_string();
 
         let url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,wind_speed_10m_max,weather_code&start_date={start}&end_date={end}"
         );
-        let resp: ForecastResponse = self.http.get(url).send().await?.error_for_status()?.json().await?;
+        let resp: ForecastResponse = self
+            .http
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
 
         let daily = resp.daily.ok_or(WeatherError::Geocoding)?;
         let mut day_notes = Vec::new();
         let day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
         for idx in 0..daily.time.len().min(7) {
-            let max_temp = daily.apparent_temperature_max.get(idx).copied().unwrap_or(0.0);
+            let max_temp = daily
+                .apparent_temperature_max
+                .get(idx)
+                .copied()
+                .unwrap_or(0.0);
             let min_temp = daily.temperature_2m_min.get(idx).copied().unwrap_or(0.0);
             let wind = daily.wind_speed_10m_max.get(idx).copied().unwrap_or(0.0);
             let code = daily.weather_code.get(idx).copied().unwrap_or(0);
@@ -196,20 +240,40 @@ impl WeatherClient {
         }
 
         if day_notes.is_empty() {
-            Ok(format!("Weather · {} · Week forecast: No special attention needed", resolved))
+            Ok(format!(
+                "Weather · {} · Week forecast: No special attention needed",
+                resolved
+            ))
         } else {
-            Ok(format!("Weather · {} · Attention needed: {}", resolved, day_notes.join("; ")))
+            Ok(format!(
+                "Weather · {} · Attention needed: {}",
+                resolved,
+                day_notes.join("; ")
+            ))
         }
     }
 
     async fn resolve_location(&self, location: &str) -> Result<(f64, f64, String), WeatherError> {
         if let Some((lat, lon)) = parse_lat_lon(location) {
-            return Ok((lat, lon, format!("{lat},{lon}")))
+            return Ok((lat, lon, format!("{lat},{lon}")));
         }
 
-        let url = format!("https://geocoding-api.open-meteo.com/v1/search?name={}&count=1", urlencoding::encode(location));
-        let resp: GeocodeResponse = self.http.get(url).send().await?.error_for_status()?.json().await?;
-        let result = resp.results.and_then(|mut list| list.pop()).ok_or(WeatherError::Geocoding)?;
+        let url = format!(
+            "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1",
+            urlencoding::encode(location)
+        );
+        let resp: GeocodeResponse = self
+            .http
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        let result = resp
+            .results
+            .and_then(|mut list| list.pop())
+            .ok_or(WeatherError::Geocoding)?;
         let label = match result.country {
             Some(country) => format!("{}, {}", result.name, country),
             None => result.name,

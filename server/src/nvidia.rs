@@ -85,7 +85,10 @@ impl NvidiaClient {
     }
 
     pub fn supported_models() -> Vec<String> {
-        NvidiaModel::all().iter().map(|(id, _)| id.to_string()).collect()
+        NvidiaModel::all()
+            .iter()
+            .map(|(id, _)| id.to_string())
+            .collect()
     }
 
     /// Send a chat completion request to NVIDIA NIM.
@@ -141,9 +144,10 @@ impl NvidiaClient {
             });
         }
 
-        let choice = resp.choices.into_iter().next().ok_or_else(|| {
-            NvidiaError::InvalidResponse("No choices in NVIDIA response".into())
-        })?;
+        let choice =
+            resp.choices.into_iter().next().ok_or_else(|| {
+                NvidiaError::InvalidResponse("No choices in NVIDIA response".into())
+            })?;
 
         let content = choice
             .message

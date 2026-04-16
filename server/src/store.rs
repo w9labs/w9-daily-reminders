@@ -107,13 +107,18 @@ impl DataStore {
         if let Some(r) = row {
             return Ok(r.try_get("id")?);
         }
-        let default = ReminderSettings { user_email: email.to_string(), ..Default::default() };
+        let default = ReminderSettings {
+            user_email: email.to_string(),
+            ..Default::default()
+        };
         let settings_json = serde_json::to_value(&default)?;
-        let row = sqlx::query("INSERT INTO user_settings (user_email, settings) VALUES ($1, $2) RETURNING id")
-            .bind(email)
-            .bind(settings_json)
-            .fetch_one(&self.pool)
-            .await?;
+        let row = sqlx::query(
+            "INSERT INTO user_settings (user_email, settings) VALUES ($1, $2) RETURNING id",
+        )
+        .bind(email)
+        .bind(settings_json)
+        .fetch_one(&self.pool)
+        .await?;
         tracing::info!(email, "Created new user settings row");
         Ok(row.try_get("id")?)
     }
@@ -130,14 +135,21 @@ impl DataStore {
                 Ok(settings)
             }
             None => {
-                let default = ReminderSettings { user_email: email.to_string(), ..Default::default() };
+                let default = ReminderSettings {
+                    user_email: email.to_string(),
+                    ..Default::default()
+                };
                 self.write_settings(email, &default).await?;
                 Ok(default)
             }
         }
     }
 
-    pub async fn write_settings(&self, email: &str, settings: &ReminderSettings) -> Result<(), StoreError> {
+    pub async fn write_settings(
+        &self,
+        email: &str,
+        settings: &ReminderSettings,
+    ) -> Result<(), StoreError> {
         let json = serde_json::to_value(settings)?;
         sqlx::query(
             "INSERT INTO user_settings (user_email, settings) VALUES ($1, $2)
@@ -150,7 +162,10 @@ impl DataStore {
         Ok(())
     }
 
-    pub async fn read_google_tokens(&self, email: &str) -> Result<Option<GoogleTokens>, StoreError> {
+    pub async fn read_google_tokens(
+        &self,
+        email: &str,
+    ) -> Result<Option<GoogleTokens>, StoreError> {
         let row = sqlx::query("SELECT google_tokens FROM user_settings WHERE user_email = $1")
             .bind(email)
             .fetch_optional(&self.pool)
@@ -167,13 +182,19 @@ impl DataStore {
         Ok(None)
     }
 
-    pub async fn write_google_tokens(&self, email: &str, tokens: Option<&GoogleTokens>) -> Result<(), StoreError> {
+    pub async fn write_google_tokens(
+        &self,
+        email: &str,
+        tokens: Option<&GoogleTokens>,
+    ) -> Result<(), StoreError> {
         let json = tokens.map(|t| serde_json::to_value(t)).transpose()?;
-        sqlx::query("UPDATE user_settings SET google_tokens = $2, updated_at = NOW() WHERE user_email = $1")
-            .bind(email)
-            .bind(json)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE user_settings SET google_tokens = $2, updated_at = NOW() WHERE user_email = $1",
+        )
+        .bind(email)
+        .bind(json)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 
@@ -194,17 +215,29 @@ impl DataStore {
         Ok(None)
     }
 
-    pub async fn write_preview(&self, email: &str, preview: &UserPreviewCache) -> Result<(), StoreError> {
+    pub async fn write_preview(
+        &self,
+        email: &str,
+        preview: &UserPreviewCache,
+    ) -> Result<(), StoreError> {
         let json = serde_json::to_value(preview)?;
-        sqlx::query("UPDATE user_settings SET last_preview = $2, updated_at = NOW() WHERE user_email = $1")
-            .bind(email)
-            .bind(json)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE user_settings SET last_preview = $2, updated_at = NOW() WHERE user_email = $1",
+        )
+        .bind(email)
+        .bind(json)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 
-    pub async fn log_execution(&self, email: &str, events_count: i32, sent: bool, error: Option<&str>) -> Result<(), StoreError> {
+    pub async fn log_execution(
+        &self,
+        email: &str,
+        events_count: i32,
+        sent: bool,
+        error: Option<&str>,
+    ) -> Result<(), StoreError> {
         sqlx::query(
             "INSERT INTO reminder_execution_log (user_email, events_count, email_sent, error_message) VALUES ($1, $2, $3, $4)",
         )
@@ -217,7 +250,11 @@ impl DataStore {
         Ok(())
     }
 
-    pub async fn get_execution_log(&self, email: &str, limit: i64) -> Result<Vec<ExecutionLogEntry>, StoreError> {
+    pub async fn get_execution_log(
+        &self,
+        email: &str,
+        limit: i64,
+    ) -> Result<Vec<ExecutionLogEntry>, StoreError> {
         let rows = sqlx::query(
             "SELECT id::text, executed_at::text, events_count, email_sent, error_message
              FROM reminder_execution_log WHERE user_email = $1 ORDER BY executed_at DESC LIMIT $2",
@@ -227,15 +264,16 @@ impl DataStore {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| {
-            ExecutionLogEntry {
+        Ok(rows
+            .into_iter()
+            .map(|r| ExecutionLogEntry {
                 id: r.try_get("id").unwrap_or_default(),
                 executed_at: r.try_get("executed_at").unwrap_or_default(),
                 events_count: r.try_get("events_count").unwrap_or(0),
                 email_sent: r.try_get("email_sent").unwrap_or(false),
                 error_message: r.try_get("error_message").ok().flatten(),
-            }
-        }).collect())
+            })
+            .collect())
     }
 
     pub async fn read_health(&self) -> Result<HealthStatus, StoreError> {
@@ -255,7 +293,11 @@ impl DataStore {
                     },
                     last_dispatch: r.try_get("last_dispatch").ok().flatten(),
                     next_run: r.try_get("next_run").ok().flatten(),
-                    google_connected: r.try_get("google_connected").ok().flatten().unwrap_or(false),
+                    google_connected: r
+                        .try_get("google_connected")
+                        .ok()
+                        .flatten()
+                        .unwrap_or(false),
                 })
             }
             None => Ok(HealthStatus::default()),
@@ -286,11 +328,14 @@ impl DataStore {
         )
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows.into_iter().map(|r| {
-            let email: String = r.try_get("user_email").unwrap_or_default();
-            let updated: DateTime<Utc> = r.try_get("updated_at").unwrap_or(Utc::now());
-            let has_google: Option<bool> = r.try_get("has_google").ok();
-            (email, updated, has_google.unwrap_or(false))
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let email: String = r.try_get("user_email").unwrap_or_default();
+                let updated: DateTime<Utc> = r.try_get("updated_at").unwrap_or(Utc::now());
+                let has_google: Option<bool> = r.try_get("has_google").ok();
+                (email, updated, has_google.unwrap_or(false))
+            })
+            .collect())
     }
 }

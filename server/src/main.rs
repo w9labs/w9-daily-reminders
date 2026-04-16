@@ -1,13 +1,13 @@
-mod models;
-mod store;
-mod weather;
 mod cerebras;
-mod pollinations;
 mod cloudflare;
-mod nvidia;
 mod email;
 mod google;
+mod models;
+mod nvidia;
+mod pollinations;
+mod store;
 mod w9mail;
+mod weather;
 
 use axum::{
     extract::{Query, State},
@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, trace::TraceLayer, services::ServeDir};
+use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
@@ -32,15 +32,15 @@ use crate::cloudflare::CloudflareAiClient;
 use crate::email::{build_preview, EmailBuildError};
 use crate::google::{GoogleClient, GoogleError};
 use crate::models::{
-    ApiResponse, CalendarEvent, GoogleAuthPayload, GoogleAuthResult, GoogleAuthStartResponse, GoogleTokens,
-    HealthStatus, ImageModelOptions, ImageProvider, AiProvider, ReminderPreview, ReminderSettings,
-    ScheduleType, Todo, WeekStartDay,
+    AiProvider, ApiResponse, CalendarEvent, GoogleAuthPayload, GoogleAuthResult,
+    GoogleAuthStartResponse, GoogleTokens, HealthStatus, ImageModelOptions, ImageProvider,
+    ReminderPreview, ReminderSettings, ScheduleType, Todo, WeekStartDay,
 };
 use crate::nvidia::{NvidiaClient, NvidiaError, NvidiaModel};
 use crate::pollinations::{PollinationsClient, PollinationsError};
-use crate::store::{DataStore, UserPreviewCache, ExecutionLogEntry};
-use crate::weather::{WeatherClient, WeatherError};
+use crate::store::{DataStore, ExecutionLogEntry, UserPreviewCache};
 use crate::w9mail::{SendEmailPayload, W9MailClient, W9MailError};
+use crate::weather::{WeatherClient, WeatherError};
 
 const CSS: &str = include_str!("../infra/templates/voxel.css");
 const W9_DB: &str = "https://db.w9.nu";
@@ -89,7 +89,11 @@ async fn verify(a: &AppState, t: &str) -> Option<serde_json::Value> {
         .send()
         .await
         .ok()?;
-    if r.status().is_success() { r.json().await.ok() } else { None }
+    if r.status().is_success() {
+        r.json().await.ok()
+    } else {
+        None
+    }
 }
 
 async fn require_email(j: &CookieJar, a: &AppState) -> Option<String> {
@@ -108,25 +112,52 @@ fn layout(t: &str, b: &str, n: &str) -> String {
 }
 
 fn pub_layout(t: &str, b: &str) -> String {
-    layout(t, b, r#"<a href="/login">Login</a><a href="/settings">Settings</a>"#)
+    layout(
+        t,
+        b,
+        r#"<a href="/login">Login</a><a href="/settings">Settings</a>"#,
+    )
 }
 
 fn user_layout(t: &str, b: &str) -> String {
-    layout(t, b, r#"<a href="/settings">Settings</a><a href="/preview">Preview</a><a href="/system">System</a><a href="/logout">Logout</a>"#)
+    layout(
+        t,
+        b,
+        r#"<a href="/settings">Settings</a><a href="/preview">Preview</a><a href="/system">System</a><a href="/logout">Logout</a>"#,
+    )
 }
 
 // ============ HTML Pages ============
 
 fn home_html() -> String {
-    pub_layout("W9 Reminders", r#"<div class="hero"><img class="hero-logo" src="/w9-logo/logo-landscape-transparent.svg" alt="W9 Labs"/><h1>W9 Daily Reminders</h1><p class="hero-sub">AI-powered daily email digests from your Google Calendar</p><p class="hero-muted">Never miss a meeting again</p><div class="hero-actions"><a href="/login" class="btn">Login with W9</a></div></div><div class="grid"><div class="card"><h3>📅 Google Calendar</h3><p>Connect your Google Calendar for daily event summaries.</p></div><div class="card"><h3>🤖 AI Summaries</h3><p>AI generates personalized daily summaries with images.</p></div><div class="card"><h3>📧 Email Delivery</h3><p>Beautiful HTML emails delivered via W9 Mail every morning.</p></div><div class="card"><h3>🌤️ Weather</h3><p>Location-based weather advisories with practical recommendations.</p></div><div class="card"><h3>🎨 AI Images</h3><p>Dynamic visuals from Pollinations.ai or Cloudflare Workers AI.</p></div><div class="card"><h3>✅ Google Tasks</h3><p>Your tasks and events together in one daily briefing.</p></div></div>"#)
+    pub_layout(
+        "W9 Reminders",
+        r#"<div class="hero"><img class="hero-logo" src="/w9-logo/logo-landscape-transparent.svg" alt="W9 Labs"/><h1>W9 Daily Reminders</h1><p class="hero-sub">AI-powered daily email digests from your Google Calendar</p><p class="hero-muted">Never miss a meeting again</p><div class="hero-actions"><a href="https://db.w9.nu/oauth/authorize?redirect_uri=https://reminder.w9.nu/oauth/callback&response_type=code&client_id=w9-reminders" class="btn" onclick="const w=window.open(this.href,'w9-reminders-login','width=520,height=720'); if (w) { w.focus(); return false; }">Login with W9</a></div></div><div class="grid"><div class="card"><h3>📅 Google Calendar</h3><p>Connect your Google Calendar for daily event summaries.</p></div><div class="card"><h3>🤖 AI Summaries</h3><p>AI generates personalized daily summaries with images.</p></div><div class="card"><h3>📧 Email Delivery</h3><p>Beautiful HTML emails delivered via W9 Mail every morning.</p></div><div class="card"><h3>🌤️ Weather</h3><p>Location-based weather advisories with practical recommendations.</p></div><div class="card"><h3>🎨 AI Images</h3><p>Dynamic visuals from Pollinations.ai or Cloudflare Workers AI.</p></div><div class="card"><h3>✅ Google Tasks</h3><p>Your tasks and events together in one daily briefing.</p></div></div>"#,
+    )
 }
 
 fn login_html() -> String {
-    pub_layout("Login", r#"<div class="card" style="max-width:420px;margin:3rem auto;text-align:center"><h1>⏰ W9 Reminders</h1><p class="text-sm text-muted mb-2">Sign in with W9 DB</p><a href="https://db.w9.nu/oauth/authorize?redirect_uri=https://reminder.w9.nu/oauth/callback&response_type=code&client_id=w9-reminders" class="btn" style="width:100%">Login with W9 DB</a></div>"#)
+    pub_layout(
+        "Login",
+        r#"<div class="card" style="max-width:420px;margin:3rem auto;text-align:center"><h1>⏰ W9 Reminders</h1><p class="text-sm text-muted mb-2">Sign in with W9 DB</p><a href="https://db.w9.nu/oauth/authorize?redirect_uri=https://reminder.w9.nu/oauth/callback&response_type=code&client_id=w9-reminders" class="btn" style="width:100%" onclick="const w=window.open(this.href,'w9-reminders-login','width=520,height=720'); if (w) { w.focus(); return false; }">Login with W9 DB</a></div>"#,
+    )
 }
 
-fn settings_html(settings: &ReminderSettings, google_connected: bool, ai_models: &AiModelsList, msg: Option<&str>) -> String {
-    let al = msg.map(|x| format!(r#"<div class="alert alert--ok">{}</div>"#, x)).unwrap_or_default();
+fn popup_close_html(target: &str) -> String {
+    format!(
+        r#"<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>W9 Reminders Login</title></head><body><script>(function(){{const target = {target:?}; if (window.opener && !window.opener.closed) {{ try {{ window.opener.location.href = target; window.opener.focus(); }} catch (_) {{}} window.close(); }} else {{ window.location.replace(target); }}}})();</script><p>Signing you in…</p></body></html>"#
+    )
+}
+
+fn settings_html(
+    settings: &ReminderSettings,
+    google_connected: bool,
+    ai_models: &AiModelsList,
+    msg: Option<&str>,
+) -> String {
+    let al = msg
+        .map(|x| format!(r#"<div class="alert alert--ok">{}</div>"#, x))
+        .unwrap_or_default();
     let google_status = if google_connected {
         r#"<div class="card mt-2" style="background:#1a3a1a;border:1px solid #2d5a2d"><h3>✅ Google Calendar & Tasks</h3><p class="text-muted">Connected and syncing events/tasks.</p><a href="/google/connect" class="btn" style="margin-top:1rem">Re-connect Google</a></div>"#
     } else {
@@ -134,27 +165,67 @@ fn settings_html(settings: &ReminderSettings, google_connected: bool, ai_models:
     };
 
     let ai_provider_options = [
-        (AiProvider::Cerebras, "Cerebras", settings.ai_provider == AiProvider::Cerebras),
-        (AiProvider::Nvidia, "NVIDIA NIM", settings.ai_provider == AiProvider::Nvidia),
+        (
+            AiProvider::Cerebras,
+            "Cerebras",
+            settings.ai_provider == AiProvider::Cerebras,
+        ),
+        (
+            AiProvider::Nvidia,
+            "NVIDIA NIM",
+            settings.ai_provider == AiProvider::Nvidia,
+        ),
     ];
-    let ai_provider_html: String = ai_provider_options.iter().map(|(p, label, sel)| {
-        format!(r#"<label><input type="radio" name="ai_provider" value="{}" {} /> {}</label>"#, 
-            match p { AiProvider::Cerebras => "cerebras", AiProvider::Nvidia => "nvidia" },
-            if *sel { "checked" } else { "" }, label)
-    }).collect::<Vec<_>>().join(" ");
+    let ai_provider_html: String = ai_provider_options
+        .iter()
+        .map(|(p, label, sel)| {
+            format!(
+                r#"<label><input type="radio" name="ai_provider" value="{}" {} /> {}</label>"#,
+                match p {
+                    AiProvider::Cerebras => "cerebras",
+                    AiProvider::Nvidia => "nvidia",
+                },
+                if *sel { "checked" } else { "" },
+                label
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
 
-    let cerebras_models = ai_models.cerebras.iter().map(|m| {
-        let sel = settings.cerebras_model.as_deref() == Some(m);
-        format!(r#"<option value="{}" {}>{}</option>"#, m, if sel { "selected" } else { "" }, m)
-    }).collect::<Vec<_>>().join("");
+    let cerebras_models = ai_models
+        .cerebras
+        .iter()
+        .map(|m| {
+            let sel = settings.cerebras_model.as_deref() == Some(m);
+            format!(
+                r#"<option value="{}" {}>{}</option>"#,
+                m,
+                if sel { "selected" } else { "" },
+                m
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
 
-    let nvidia_models = ai_models.nvidia.iter().map(|(id, label)| {
-        let sel = settings.nvidia_model.as_deref() == Some(id);
-        format!(r#"<option value="{}" {}>{}</option>"#, id, if sel { "selected" } else { "" }, label)
-    }).collect::<Vec<_>>().join("");
+    let nvidia_models = ai_models
+        .nvidia
+        .iter()
+        .map(|(id, label)| {
+            let sel = settings.nvidia_model.as_deref() == Some(id);
+            format!(
+                r#"<option value="{}" {}>{}</option>"#,
+                id,
+                if sel { "selected" } else { "" },
+                label
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
 
-    user_layout("Settings", &format!(
-        r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>⚙️ Reminder Settings</h1>{}<form id="settings-form"><label>Email</label><input type="email" id="user_email" value="{}" required placeholder="you@w9.nu"/><label>Reminder Time</label><input type="time" id="reminder_time" value="{}" required/><label>Timezone</label><input type="text" id="timezone" value="{}" placeholder="Europe/Stockholm"/><label>Language</label><input type="text" id="language" value="{}" placeholder="English"/><label>Weather Location</label><input type="text" id="weather_location" value="{}" placeholder="Stockholm, Sweden"/><label><input type="checkbox" id="include_weather" {} /> Include Weather</label><label><input type="checkbox" id="include_image" {} /> Include AI Image</label><label>Image Provider</label><select id="image_provider"><option value="pollinations" {}>Pollinations</option><option value="cloudflare" {}>Cloudflare</option></select><label>AI Provider</label><div style="display:flex;gap:1rem;margin:0.5rem 0">{}</div><label>Cerebras Model</label><select id="cerebras_model">{}</select><label>NVIDIA Model</label><select id="nvidia_model">{}</select><label>Summary Style</label><select id="summary_style"><option value="concise" {}>Concise</option><option value="detailed" {}>Detailed</option><option value="bullet" {}>Bullet</option></select><label>Schedule Type</label><select id="schedule_type"><option value="day" {}>Day</option><option value="week" {}>Week</option></select><button type="submit" class="btn mt-1" style="width:100%">Save Settings</button></form><div id="settings-msg" class="mt-1"></div>{}</div><script>
+    user_layout(
+        "Settings",
+        &format!(
+            r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>⚙️ Reminder Settings</h1>{}<form id="settings-form"><label>Email</label><input type="email" id="user_email" value="{}" required placeholder="you@w9.nu"/><label>Reminder Time</label><input type="time" id="reminder_time" value="{}" required/><label>Timezone</label><input type="text" id="timezone" value="{}" placeholder="Europe/Stockholm"/><label>Language</label><input type="text" id="language" value="{}" placeholder="English"/><label>Weather Location</label><input type="text" id="weather_location" value="{}" placeholder="Stockholm, Sweden"/><label><input type="checkbox" id="include_weather" {} /> Include Weather</label><label><input type="checkbox" id="include_image" {} /> Include AI Image</label><label>Image Provider</label><select id="image_provider"><option value="pollinations" {}>Pollinations</option><option value="cloudflare" {}>Cloudflare</option></select><label>AI Provider</label><div style="display:flex;gap:1rem;margin:0.5rem 0">{}</div><label>Cerebras Model</label><select id="cerebras_model">{}</select><label>NVIDIA Model</label><select id="nvidia_model">{}</select><label>Summary Style</label><select id="summary_style"><option value="concise" {}>Concise</option><option value="detailed" {}>Detailed</option><option value="bullet" {}>Bullet</option></select><label>Schedule Type</label><select id="schedule_type"><option value="day" {}>Day</option><option value="week" {}>Week</option></select><button type="submit" class="btn mt-1" style="width:100%">Save Settings</button></form><div id="settings-msg" class="mt-1"></div>{}</div><script>
 document.getElementById('settings-form').addEventListener('submit', async (e) => {{
     e.preventDefault();
     const msg = document.getElementById('settings-msg');
@@ -184,22 +255,63 @@ document.getElementById('settings-form').addEventListener('submit', async (e) =>
     }} catch(err) {{ msg.textContent = '❌ Network error'; msg.className = 'mt-1 alert alert--err'; }}
 }});
 </script>"#,
-        al, settings.user_email, settings.reminder_time, settings.timezone, settings.language,
-        settings.weather_location,
-        if settings.include_weather { "checked" } else { "" },
-        if settings.include_image { "checked" } else { "" },
-        if settings.image_provider == ImageProvider::Pollinations { "selected" } else { "" },
-        if settings.image_provider == ImageProvider::Cloudflare { "selected" } else { "" },
-        ai_provider_html,
-        cerebras_models,
-        nvidia_models,
-        if settings.summary_style == models::SummaryStyle::Concise { "selected" } else { "" },
-        if settings.summary_style == models::SummaryStyle::Detailed { "selected" } else { "" },
-        if settings.summary_style == models::SummaryStyle::Bullet { "selected" } else { "" },
-        if settings.schedule_type == ScheduleType::Day { "selected" } else { "" },
-        if settings.schedule_type == ScheduleType::Week { "selected" } else { "" },
-        google_status,
-    ))
+            al,
+            settings.user_email,
+            settings.reminder_time,
+            settings.timezone,
+            settings.language,
+            settings.weather_location,
+            if settings.include_weather {
+                "checked"
+            } else {
+                ""
+            },
+            if settings.include_image {
+                "checked"
+            } else {
+                ""
+            },
+            if settings.image_provider == ImageProvider::Pollinations {
+                "selected"
+            } else {
+                ""
+            },
+            if settings.image_provider == ImageProvider::Cloudflare {
+                "selected"
+            } else {
+                ""
+            },
+            ai_provider_html,
+            cerebras_models,
+            nvidia_models,
+            if settings.summary_style == models::SummaryStyle::Concise {
+                "selected"
+            } else {
+                ""
+            },
+            if settings.summary_style == models::SummaryStyle::Detailed {
+                "selected"
+            } else {
+                ""
+            },
+            if settings.summary_style == models::SummaryStyle::Bullet {
+                "selected"
+            } else {
+                ""
+            },
+            if settings.schedule_type == ScheduleType::Day {
+                "selected"
+            } else {
+                ""
+            },
+            if settings.schedule_type == ScheduleType::Week {
+                "selected"
+            } else {
+                ""
+            },
+            google_status,
+        ),
+    )
 }
 
 struct AiModelsList {
@@ -218,7 +330,10 @@ fn preview_html(preview: Option<&UserPreviewCache>) -> String {
         ),
         None => r#"<div class="card"><h2>No preview generated yet</h2><p>Click "Generate Preview" to create your daily reminder.</p></div>"#.to_string(),
     };
-    user_layout("Preview", &format!(r#"<div style="max-width:800px;margin:2rem auto"><h1>📧 Email Preview</h1><div style="display:flex;gap:1rem"><button id="gen-btn" class="btn">Generate Preview</button><button id="send-btn" class="btn" style="background:#2d5a2d">Send Test Email</button></div><div id="preview-msg" class="mt-1"></div>{}</div><script>
+    user_layout(
+        "Preview",
+        &format!(
+            r#"<div style="max-width:800px;margin:2rem auto"><h1>📧 Email Preview</h1><div style="display:flex;gap:1rem"><button id="gen-btn" class="btn">Generate Preview</button><button id="send-btn" class="btn" style="background:#2d5a2d">Send Test Email</button></div><div id="preview-msg" class="mt-1"></div>{}</div><script>
 document.getElementById('gen-btn').addEventListener('click', async () => {{
     const msg = document.getElementById('preview-msg');
     msg.textContent = 'Generating preview... This may take 30-60s';
@@ -247,80 +362,201 @@ document.getElementById('send-btn').addEventListener('click', async () => {{
         else {{ msg.textContent = '❌ ' + (data.error || 'Send failed'); msg.className = 'mt-1 alert alert--err'; }}
     }} catch(err) {{ msg.textContent = '❌ Network error'; msg.className = 'mt-1 alert alert--err'; }}
 }});
-</script>"#, content))
+</script>"#,
+            content
+        ),
+    )
 }
 
 fn system_html(health: &HealthStatus, log: &[ExecutionLogEntry]) -> String {
-    let log_rows: String = log.iter().map(|entry| {
-        let badge = if entry.email_sent {
-            r#"<span class="badge badge--ok">Sent</span>"#
-        } else {
-            r#"<span class="badge badge--err">Failed</span>"#
-        };
-        let err = entry.error_message.as_deref().map(|e| format!(r#" <span class="text-xs text-muted">{}</span>"#, e)).unwrap_or_default();
-        format!(r#"<tr><td class="text-xs">{}</td><td>{}</td><td>{}</td>{}</tr>"#,
-            entry.executed_at, entry.events_count, badge, err)
-    }).collect();
-    user_layout("System Status", &format!(
-        r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>🖥️ System Status</h1><table><tr><th>Metric</th><th>Value</th></tr><tr><td>Scheduler State</td><td>{:?}</td></tr><tr><td>Last Dispatch</td><td>{}</td></tr><tr><td>Next Run</td><td>{}</td></tr><tr><td>Google Connected</td><td>{}</td></tr></table></div><div class="card mt-2" style="max-width:700px;margin:1rem auto"><h2>📊 Execution Log (Last 50)</h2><table><tr><th>Executed</th><th>Events</th><th>Status</th></tr>{}</table></div>"#,
-        health.scheduler,
-        health.last_dispatch.map(|t| t.format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "Never".into()),
-        health.next_run.map(|t| t.format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "Not scheduled".into()),
-        if health.google_connected { "✅ Yes" } else { "❌ No" },
-        log_rows,
-    ))
+    let log_rows: String = log
+        .iter()
+        .map(|entry| {
+            let badge = if entry.email_sent {
+                r#"<span class="badge badge--ok">Sent</span>"#
+            } else {
+                r#"<span class="badge badge--err">Failed</span>"#
+            };
+            let err = entry
+                .error_message
+                .as_deref()
+                .map(|e| format!(r#" <span class="text-xs text-muted">{}</span>"#, e))
+                .unwrap_or_default();
+            format!(
+                r#"<tr><td class="text-xs">{}</td><td>{}</td><td>{}</td>{}</tr>"#,
+                entry.executed_at, entry.events_count, badge, err
+            )
+        })
+        .collect();
+    user_layout(
+        "System Status",
+        &format!(
+            r#"<div class="card" style="max-width:700px;margin:2rem auto"><h1>🖥️ System Status</h1><table><tr><th>Metric</th><th>Value</th></tr><tr><td>Scheduler State</td><td>{:?}</td></tr><tr><td>Last Dispatch</td><td>{}</td></tr><tr><td>Next Run</td><td>{}</td></tr><tr><td>Google Connected</td><td>{}</td></tr></table></div><div class="card mt-2" style="max-width:700px;margin:1rem auto"><h2>📊 Execution Log (Last 50)</h2><table><tr><th>Executed</th><th>Events</th><th>Status</th></tr>{}</table></div>"#,
+            health.scheduler,
+            health
+                .last_dispatch
+                .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or_else(|| "Never".into()),
+            health
+                .next_run
+                .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or_else(|| "Not scheduled".into()),
+            if health.google_connected {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            },
+            log_rows,
+        ),
+    )
 }
 
 // ============ Routes ============
 
-async fn home() -> Html<String> { Html(home_html()) }
-async fn login_page() -> Html<String> { Html(login_html()) }
-
-async fn oauth_cb(State(s): State<AppState>, jar: CookieJar, Query(q): Query<serde_json::Value>) -> impl IntoResponse {
-    let code = match q.get("code").and_then(|v| v.as_str()) { Some(c) => c.to_string(), None => return Html(login_html()).into_response() };
-    let res = match s.http_client.post(format!("{}/oauth/token", W9_DB)).form(&[("grant_type", "authorization_code"), ("code", &code), ("redirect_uri", "https://reminder.w9.nu/oauth/callback")]).send().await { Ok(r) => r, Err(_) => return Html(login_html()).into_response() };
-    let json = match res.json::<serde_json::Value>().await { Ok(j) => j, Err(_) => return Html(login_html()).into_response() };
-    let token = match json.get("access_token").and_then(|v| v.as_str()) { Some(t) => t.to_string(), None => return Html(login_html()).into_response() };
-    (set_s(jar, token), Redirect::to("/settings")).into_response()
+async fn home() -> Html<String> {
+    Html(home_html())
+}
+async fn login_page() -> Html<String> {
+    Html(login_html())
 }
 
-async fn logout(jar: CookieJar) -> impl IntoResponse { (clr_s(jar), Redirect::to("/")).into_response() }
+async fn oauth_cb(
+    State(s): State<AppState>,
+    jar: CookieJar,
+    Query(q): Query<serde_json::Value>,
+) -> impl IntoResponse {
+    let code = match q.get("code").and_then(|v| v.as_str()) {
+        Some(c) => c.to_string(),
+        None => return Html(login_html()).into_response(),
+    };
+    let res = match s
+        .http_client
+        .post(format!("{}/oauth/token", W9_DB))
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", &code),
+            ("redirect_uri", "https://reminder.w9.nu/oauth/callback"),
+        ])
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return Html(login_html()).into_response(),
+    };
+    let json = match res.json::<serde_json::Value>().await {
+        Ok(j) => j,
+        Err(_) => return Html(login_html()).into_response(),
+    };
+    let token = match json.get("access_token").and_then(|v| v.as_str()) {
+        Some(t) => t.to_string(),
+        None => return Html(login_html()).into_response(),
+    };
+    (set_s(jar, token), Html(popup_close_html("/settings"))).into_response()
+}
+
+async fn logout(jar: CookieJar) -> impl IntoResponse {
+    (clr_s(jar), Redirect::to("/")).into_response()
+}
 
 async fn settings_page(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return Redirect::to("/login").into_response() };
-    let _ = s.store.ensure_user(&email).await;
-    let settings = match s.store.read_settings(&email).await { Ok(st) => st, Err(_) => return Html(user_layout("Error", "<div class=\"card\"><h1>Failed to load settings</h1></div>")).into_response() };
-    let health = match s.store.read_health().await { Ok(h) => h, Err(_) => HealthStatus::default() };
-    let models = AiModelsList {
-        cerebras: if s.cerebras.as_ref().is_some() { CerebrasClient::supported_models() } else { vec![] },
-        nvidia: if s.nvidia.as_ref().is_some() { NvidiaModel::all().iter().map(|(a, b)| (a.to_string(), b.to_string())).collect() } else { vec![] },
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => return Redirect::to("/login").into_response(),
     };
-    Html(settings_html(&settings, health.google_connected, &models, None)).into_response()
+    let _ = s.store.ensure_user(&email).await;
+    let settings = match s.store.read_settings(&email).await {
+        Ok(st) => st,
+        Err(_) => {
+            return Html(user_layout(
+                "Error",
+                "<div class=\"card\"><h1>Failed to load settings</h1></div>",
+            ))
+            .into_response()
+        }
+    };
+    let health = match s.store.read_health().await {
+        Ok(h) => h,
+        Err(_) => HealthStatus::default(),
+    };
+    let models = AiModelsList {
+        cerebras: if s.cerebras.as_ref().is_some() {
+            CerebrasClient::supported_models()
+        } else {
+            vec![]
+        },
+        nvidia: if s.nvidia.as_ref().is_some() {
+            NvidiaModel::all()
+                .iter()
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .collect()
+        } else {
+            vec![]
+        },
+    };
+    Html(settings_html(
+        &settings,
+        health.google_connected,
+        &models,
+        None,
+    ))
+    .into_response()
 }
 
 async fn preview_page(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return Redirect::to("/login").into_response() };
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => return Redirect::to("/login").into_response(),
+    };
     let cached = s.store.read_preview(&email).await.ok().flatten();
     Html(preview_html(cached.as_ref())).into_response()
 }
 
 async fn system_page(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return Redirect::to("/login").into_response() };
-    let health = match s.store.read_health().await { Ok(h) => h, Err(_) => HealthStatus::default() };
-    let log = s.store.get_execution_log(&email, 50).await.unwrap_or_default();
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => return Redirect::to("/login").into_response(),
+    };
+    let health = match s.store.read_health().await {
+        Ok(h) => h,
+        Err(_) => HealthStatus::default(),
+    };
+    let log = s
+        .store
+        .get_execution_log(&email, 50)
+        .await
+        .unwrap_or_default();
     Html(system_html(&health, &log)).into_response()
 }
 
 async fn google_connect(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return Redirect::to("/login").into_response() };
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => return Redirect::to("/login").into_response(),
+    };
     let _ = s.store.ensure_user(&email).await;
-    let google = match s.google.as_ref().as_ref() { Some(g) => g, None => return Html(user_layout("Error", "<div class=\"card\"><h1>Google OAuth not configured</h1></div>")).into_response() };
+    let google = match s.google.as_ref().as_ref() {
+        Some(g) => g,
+        None => {
+            return Html(user_layout(
+                "Error",
+                "<div class=\"card\"><h1>Google OAuth not configured</h1></div>",
+            ))
+            .into_response()
+        }
+    };
     let url = google.auth_url(&Uuid::new_v4().to_string());
     Redirect::to(&url).into_response()
 }
 
-async fn google_callback(State(s): State<AppState>, jar: CookieJar, Query(q): Query<serde_json::Value>) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return Redirect::to("/login").into_response() };
+async fn google_callback(
+    State(s): State<AppState>,
+    jar: CookieJar,
+    Query(q): Query<serde_json::Value>,
+) -> impl IntoResponse {
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => return Redirect::to("/login").into_response(),
+    };
     let _ = s.store.ensure_user(&email).await;
     let code = match q.get("code").and_then(|v| v.as_str()) {
         Some(c) => c.to_string(),
@@ -329,11 +565,25 @@ async fn google_callback(State(s): State<AppState>, jar: CookieJar, Query(q): Qu
             return Html(user_layout("Google OAuth Error", &format!("<div class=\"card\" style=\"max-width:600px;margin:2rem auto\"><h1>❌ Google OAuth Error</h1><p>Error: {}</p><a href=\"/settings\" class=\"btn\">Back to Settings</a></div>", error))).into_response();
         }
     };
-    let google = match s.google.as_ref().as_ref() { Some(g) => g, None => return Html(user_layout("Error", "<div class=\"card\"><h1>Google OAuth not configured</h1></div>")).into_response() };
+    let google = match s.google.as_ref().as_ref() {
+        Some(g) => g,
+        None => {
+            return Html(user_layout(
+                "Error",
+                "<div class=\"card\"><h1>Google OAuth not configured</h1></div>",
+            ))
+            .into_response()
+        }
+    };
     match google.exchange_code(&code).await {
         Ok(tokens) => {
-            if let Err(e) = s.store.write_google_tokens(&email, Some(&tokens)).await { tracing::error!(?e, "Failed to store Google tokens"); }
-            let mut health = match s.store.read_health().await { Ok(h) => h, Err(_) => HealthStatus::default() };
+            if let Err(e) = s.store.write_google_tokens(&email, Some(&tokens)).await {
+                tracing::error!(?e, "Failed to store Google tokens");
+            }
+            let mut health = match s.store.read_health().await {
+                Ok(h) => h,
+                Err(_) => HealthStatus::default(),
+            };
             health.google_connected = true;
             let _ = s.store.write_health(&health).await;
             Html(user_layout("Google Connected", r#"<div class="card" style="max-width:600px;margin:2rem auto;text-align:center"><h1>✅ Google Calendar Connected</h1><p class="text-muted">Your Google Calendar and Tasks are now synced.</p><a href="/settings" class="btn mt-2">Back to Settings</a><a href="/preview" class="btn mt-1" style="margin-left:1rem">Generate Preview</a></div>"#)).into_response()
@@ -348,15 +598,41 @@ async fn google_callback(State(s): State<AppState>, jar: CookieJar, Query(q): Qu
 // ============ API ============
 
 async fn api_settings_get(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response() };
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
+    };
     match s.store.read_settings(&email).await {
         Ok(settings) => Json(ApiResponse { data: settings }).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
-async fn api_settings_post(State(s): State<AppState>, jar: CookieJar, Json(payload): Json<ReminderSettings>) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response() };
+async fn api_settings_post(
+    State(s): State<AppState>,
+    jar: CookieJar,
+    Json(payload): Json<ReminderSettings>,
+) -> impl IntoResponse {
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
+    };
     let _ = s.store.ensure_user(&email).await;
 
     tracing::info!(session_email = %email, form_email = %payload.user_email, ai_provider = ?payload.ai_provider, "Saving user settings");
@@ -364,22 +640,45 @@ async fn api_settings_post(State(s): State<AppState>, jar: CookieJar, Json(paylo
     match s.store.write_settings(&email, &payload).await {
         Ok(_) => {
             // Return the saved settings so UI can confirm
-            let saved = s.store.read_settings(&email).await.unwrap_or(payload.clone());
+            let saved = s
+                .store
+                .read_settings(&email)
+                .await
+                .unwrap_or(payload.clone());
             tracing::info!(session_email = %email, saved_email = %saved.user_email, "Settings saved successfully");
             Json(ApiResponse { data: saved }).into_response()
         }
         Err(e) => {
             tracing::error!(session_email = %email, error = %e, "Failed to save settings");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
         }
     }
 }
 
 async fn api_generate_preview(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response() };
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
+    };
     let settings = match s.store.read_settings(&email).await {
         Ok(st) => st,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
+        }
     };
     let tokens = s.store.read_google_tokens(&email).await.ok().flatten();
     match generate_preview_for_user(&s, &email, settings, tokens).await {
@@ -396,12 +695,25 @@ async fn api_generate_preview(State(s): State<AppState>, jar: CookieJar) -> impl
             let _ = s.store.write_preview(&email, &cache).await;
             Json(ApiResponse { data: preview }).into_response()
         }
-        Err(e) => (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
 async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoResponse {
-    let email = match require_email(&jar, &s).await { Some(e) => e, None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response() };
+    let email = match require_email(&jar, &s).await {
+        Some(e) => e,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error":"unauthorized"})),
+            )
+                .into_response()
+        }
+    };
 
     // Only use cached preview — don't auto-generate (avoids Caddy timeout)
     let preview = match s.store.read_preview(&email).await {
@@ -413,13 +725,23 @@ async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
             image_url: cached.image_url,
             generated_language: cached.generated_language,
         },
-        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"No cached preview found. Generate a preview first."}))).into_response(),
+        _ => return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error":"No cached preview found. Generate a preview first."})),
+        )
+            .into_response(),
     };
 
     // Load settings to get the user's email for delivery
     let settings = match s.store.read_settings(&email).await {
         Ok(st) => st,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
+        }
     };
 
     // Send via W9 Mail (matches w9-db payload format: from_alias + body_html)
@@ -434,29 +756,57 @@ async fn api_send_email(State(s): State<AppState>, jar: CookieJar) -> impl IntoR
 
     tracing::info!(to = %to_email, from_alias = "reminder@w9.nu", "Sending email via W9 Mail");
 
-    match s.mail_client.send_email(mail_base, W9_MAIL_TOKEN, &payload).await {
+    match s
+        .mail_client
+        .send_email(mail_base, W9_MAIL_TOKEN, &payload)
+        .await
+    {
         Ok(_) => {
             let _ = s.store.log_execution(&email, 0, true, None).await;
             Json(serde_json::json!({"status": "sent", "to": to_email})).into_response()
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to send email via W9 Mail");
-            let _ = s.store.log_execution(&email, 0, false, Some(&e.to_string())).await;
-            (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+            let _ = s
+                .store
+                .log_execution(&email, 0, false, Some(&e.to_string()))
+                .await;
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
         }
     }
 }
 
 async fn api_health(State(s): State<AppState>) -> Json<ApiResponse<HealthStatus>> {
-    let health = match s.store.read_health().await { Ok(h) => h, Err(_) => HealthStatus::default() };
+    let health = match s.store.read_health().await {
+        Ok(h) => h,
+        Err(_) => HealthStatus::default(),
+    };
     Json(ApiResponse { data: health })
 }
 
 async fn api_image_models(State(s): State<AppState>) -> Json<ApiResponse<ImageModelOptions>> {
-    let pollinations = s.pollinations.get_available_models().await.unwrap_or_default();
+    let pollinations = s
+        .pollinations
+        .get_available_models()
+        .await
+        .unwrap_or_default();
     let cloudflare = CloudflareAiClient::supported_models();
-    let cerebras = if s.cerebras.as_ref().is_some() { CerebrasClient::supported_models() } else { vec![] };
-    Json(ApiResponse { data: ImageModelOptions { pollinations, cloudflare, cerebras } })
+    let cerebras = if s.cerebras.as_ref().is_some() {
+        CerebrasClient::supported_models()
+    } else {
+        vec![]
+    };
+    Json(ApiResponse {
+        data: ImageModelOptions {
+            pollinations,
+            cloudflare,
+            cerebras,
+        },
+    })
 }
 
 // ============ Core: Generate Preview ============
@@ -482,16 +832,44 @@ impl std::fmt::Display for PreviewError {
     }
 }
 
-impl From<WeatherError> for PreviewError { fn from(e: WeatherError) -> Self { PreviewError::Weather(e) } }
-impl From<GoogleError> for PreviewError { fn from(e: GoogleError) -> Self { PreviewError::Google(e) } }
-impl From<EmailBuildError> for PreviewError { fn from(e: EmailBuildError) -> Self { PreviewError::Email(e) } }
-impl From<serde_json::Error> for PreviewError { fn from(e: serde_json::Error) -> Self { PreviewError::Serde(e) } }
+impl From<WeatherError> for PreviewError {
+    fn from(e: WeatherError) -> Self {
+        PreviewError::Weather(e)
+    }
+}
+impl From<GoogleError> for PreviewError {
+    fn from(e: GoogleError) -> Self {
+        PreviewError::Google(e)
+    }
+}
+impl From<EmailBuildError> for PreviewError {
+    fn from(e: EmailBuildError) -> Self {
+        PreviewError::Email(e)
+    }
+}
+impl From<serde_json::Error> for PreviewError {
+    fn from(e: serde_json::Error) -> Self {
+        PreviewError::Serde(e)
+    }
+}
 
 fn sample_events() -> Vec<CalendarEvent> {
     let now = Utc::now();
     vec![
-        CalendarEvent { id: Uuid::new_v4(), summary: "Standup".into(), start: now + Duration::hours(2), end: now + Duration::hours(3), location: Some("Meet / video".into()) },
-        CalendarEvent { id: Uuid::new_v4(), summary: "Client sync".into(), start: now + Duration::hours(5), end: now + Duration::hours(6), location: Some("HQ".into()) },
+        CalendarEvent {
+            id: Uuid::new_v4(),
+            summary: "Standup".into(),
+            start: now + Duration::hours(2),
+            end: now + Duration::hours(3),
+            location: Some("Meet / video".into()),
+        },
+        CalendarEvent {
+            id: Uuid::new_v4(),
+            summary: "Client sync".into(),
+            start: now + Duration::hours(5),
+            end: now + Duration::hours(6),
+            location: Some("HQ".into()),
+        },
     ]
 }
 
@@ -507,52 +885,107 @@ async fn generate_preview_for_user(
     let start_date = local_now.date_naive();
     let end_date = start_date + Duration::days(1);
 
-    let start_dt_utc = start_date.and_hms_opt(0, 0, 0).and_then(|dt| tz.from_local_datetime(&dt).single()).map(|dt| dt.with_timezone(&Utc)).unwrap_or(now);
-    let end_dt_utc = end_date.and_hms_opt(0, 0, 0).and_then(|dt| tz.from_local_datetime(&dt).single()).map(|dt| dt.with_timezone(&Utc)).unwrap_or(now + Duration::days(1));
+    let start_dt_utc = start_date
+        .and_hms_opt(0, 0, 0)
+        .and_then(|dt| tz.from_local_datetime(&dt).single())
+        .map(|dt| dt.with_timezone(&Utc))
+        .unwrap_or(now);
+    let end_dt_utc = end_date
+        .and_hms_opt(0, 0, 0)
+        .and_then(|dt| tz.from_local_datetime(&dt).single())
+        .map(|dt| dt.with_timezone(&Utc))
+        .unwrap_or(now + Duration::days(1));
 
     // Fetch calendar events
-    let events = if let (Some(client), Some(tokens)) = (state.google.as_ref().as_ref(), google_tokens.as_ref()) {
+    let events = if let (Some(client), Some(tokens)) =
+        (state.google.as_ref().as_ref(), google_tokens.as_ref())
+    {
         let client = client.clone();
         let tokens = tokens.clone();
         match fetch_events(&client, tokens, start_dt_utc, end_dt_utc).await {
-            Ok(ev) => if ev.is_empty() { sample_events() } else { ev },
-            Err(e) => { tracing::warn!(?e, "Google events fetch failed, using sample"); sample_events() }
+            Ok(ev) => {
+                if ev.is_empty() {
+                    sample_events()
+                } else {
+                    ev
+                }
+            }
+            Err(e) => {
+                tracing::warn!(?e, "Google events fetch failed, using sample");
+                sample_events()
+            }
         }
-    } else { sample_events() };
+    } else {
+        sample_events()
+    };
 
     // Fetch todos
-    let todos = if let (Some(client), Some(tokens)) = (state.google.as_ref().as_ref(), google_tokens.as_ref()) {
+    let todos = if let (Some(client), Some(tokens)) =
+        (state.google.as_ref().as_ref(), google_tokens.as_ref())
+    {
         let client = client.clone();
         let tokens = tokens.clone();
         match client.list_todos(&tokens).await {
             Ok((t, _)) => t,
-            Err(e) => { tracing::warn!(?e, "Google todos fetch failed"); vec![] }
+            Err(e) => {
+                tracing::warn!(?e, "Google todos fetch failed");
+                vec![]
+            }
         }
-    } else { vec![] };
+    } else {
+        vec![]
+    };
 
     // Weather
     let weather_note = if settings.include_weather {
-        match state.weather.day_forecast_4h(&settings.weather_location, start_dt_utc).await {
+        match state
+            .weather
+            .day_forecast_4h(&settings.weather_location, start_dt_utc)
+            .await
+        {
             Ok(note) => Some(note),
             Err(_) => None,
         }
-    } else { None };
+    } else {
+        None
+    };
 
     // AI generation
     let raw = match settings.ai_provider {
         AiProvider::Cerebras => {
-            let client = state.cerebras.as_ref().as_ref().ok_or(PreviewError::AiProvider("Cerebras not configured".into()))?;
+            let client = state
+                .cerebras
+                .as_ref()
+                .as_ref()
+                .ok_or(PreviewError::AiProvider("Cerebras not configured".into()))?;
             let model = settings.cerebras_model.as_deref().unwrap_or("zai-glm-4.6");
-            tracing::info!(model, provider = "cerebras", "Generating email via Cerebras");
-            client.generate_email(model, &settings, &events, &todos, weather_note.as_deref()).await
+            tracing::info!(
+                model,
+                provider = "cerebras",
+                "Generating email via Cerebras"
+            );
+            client
+                .generate_email(model, &settings, &events, &todos, weather_note.as_deref())
+                .await
                 .map_err(|e| PreviewError::AiProvider(e.to_string()))?
         }
         AiProvider::Nvidia => {
-            let client = state.nvidia.as_ref().as_ref().ok_or(PreviewError::AiProvider("NVIDIA not configured".into()))?;
-            let model_str = settings.nvidia_model.as_deref().unwrap_or("minimaxai/minimax-m2.7");
+            let client = state
+                .nvidia
+                .as_ref()
+                .as_ref()
+                .ok_or(PreviewError::AiProvider("NVIDIA not configured".into()))?;
+            let model_str = settings
+                .nvidia_model
+                .as_deref()
+                .unwrap_or("minimaxai/minimax-m2.7");
             let model = NvidiaModel::from_str(model_str);
             let prompt = build_nvidia_prompt(&settings, &events, &todos, weather_note.as_deref());
-            tracing::info!(model = model_str, provider = "nvidia", "Generating email via NVIDIA");
+            tracing::info!(
+                model = model_str,
+                provider = "nvidia",
+                "Generating email via NVIDIA"
+            );
             client.chat(model, "You are W9 Reminders AI. Output ONLY valid JSON. Follow the user's formatting instructions precisely.", &prompt).await
                 .map_err(|e| PreviewError::AiProvider(e.to_string()))?
         }
@@ -564,14 +997,21 @@ async fn generate_preview_for_user(
         if let Ok(prompt) = extract_image_prompt(&raw) {
             match settings.image_provider {
                 ImageProvider::Pollinations => {
-                    match state.pollinations.generate(&prompt, settings.image_model.as_deref()).await {
+                    match state
+                        .pollinations
+                        .generate(&prompt, settings.image_model.as_deref())
+                        .await
+                    {
                         Ok(url) => image_url = Some(url),
                         Err(e) => tracing::warn!(?e, "Pollinations generation failed"),
                     }
                 }
                 ImageProvider::Cloudflare => {
                     if let Some(cf) = state.cloudflare.as_ref().as_ref() {
-                        match cf.generate(&prompt, settings.cloudflare_model.as_deref()).await {
+                        match cf
+                            .generate(&prompt, settings.cloudflare_model.as_deref())
+                            .await
+                        {
                             Ok(url) => image_url = Some(url),
                             Err(e) => tracing::warn!(?e, "Cloudflare generation failed"),
                         }
@@ -586,7 +1026,12 @@ async fn generate_preview_for_user(
     Ok(preview)
 }
 
-fn build_nvidia_prompt(settings: &ReminderSettings, events: &[CalendarEvent], todos: &[Todo], weather: Option<&str>) -> String {
+fn build_nvidia_prompt(
+    settings: &ReminderSettings,
+    events: &[CalendarEvent],
+    todos: &[Todo],
+    weather: Option<&str>,
+) -> String {
     let mut prompt = String::new();
     prompt.push_str("Generate AI reminder email copy for W9 brand. JSON only.\n");
     prompt.push_str(&format!("Language: {}\n", settings.language));
@@ -602,7 +1047,13 @@ fn build_nvidia_prompt(settings: &ReminderSettings, events: &[CalendarEvent], to
         for event in events {
             let start = event.start.with_timezone(&tz);
             let end = event.end.with_timezone(&tz);
-            prompt.push_str(&format!("- {} from {} to {} at {}\n", event.summary, start.format("%H:%M"), end.format("%H:%M"), event.location.as_deref().unwrap_or("N/A")));
+            prompt.push_str(&format!(
+                "- {} from {} to {} at {}\n",
+                event.summary,
+                start.format("%H:%M"),
+                end.format("%H:%M"),
+                event.location.as_deref().unwrap_or("N/A")
+            ));
         }
     }
     if !todos.is_empty() {
@@ -610,32 +1061,50 @@ fn build_nvidia_prompt(settings: &ReminderSettings, events: &[CalendarEvent], to
         for todo in todos {
             if let Some(due) = todo.due {
                 let due_local = due.with_timezone(&tz);
-                prompt.push_str(&format!("- {} (due: {})\n", todo.title, due_local.format("%H:%M")));
+                prompt.push_str(&format!(
+                    "- {} (due: {})\n",
+                    todo.title,
+                    due_local.format("%H:%M")
+                ));
             } else {
                 prompt.push_str(&format!("- {}\n", todo.title));
             }
             if let Some(notes) = &todo.notes {
-                if !notes.trim().is_empty() { prompt.push_str(&format!("  Note: {}\n", notes)); }
+                if !notes.trim().is_empty() {
+                    prompt.push_str(&format!("  Note: {}\n", notes));
+                }
             }
         }
     }
     if let Some(w) = weather {
-        prompt.push_str(&format!("\nWeather: {}. Do NOT include weather in html_body.\n", w));
+        prompt.push_str(&format!(
+            "\nWeather: {}. Do NOT include weather in html_body.\n",
+            w
+        ));
     }
     prompt.push_str("Return stringified JSON.");
     prompt
 }
 
-async fn fetch_events(client: &GoogleClient, tokens: GoogleTokens, time_min: chrono::DateTime<Utc>, time_max: chrono::DateTime<Utc>) -> Result<Vec<CalendarEvent>, GoogleError> {
+async fn fetch_events(
+    client: &GoogleClient,
+    tokens: GoogleTokens,
+    time_min: chrono::DateTime<Utc>,
+    time_max: chrono::DateTime<Utc>,
+) -> Result<Vec<CalendarEvent>, GoogleError> {
     let (events, _refreshed) = client.list_events(&tokens, time_min, time_max).await?;
     Ok(events)
 }
 
 fn extract_image_prompt(raw: &str) -> Result<String, PreviewError> {
     #[derive(Deserialize)]
-    struct Helper { image_prompt: Option<String> }
+    struct Helper {
+        image_prompt: Option<String>,
+    }
     let helper: Helper = serde_json::from_str(raw)?;
-    helper.image_prompt.filter(|s| !s.trim().is_empty())
+    helper
+        .image_prompt
+        .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| PreviewError::AiProvider("image prompt missing".into()))
 }
 
@@ -644,7 +1113,10 @@ fn extract_image_prompt(raw: &str) -> Result<String, PreviewError> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "w9_daily_reminders=info,axum=info".into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "w9_daily_reminders=info,axum=info".into()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
     dotenvy::dotenv().ok();
@@ -653,14 +1125,17 @@ async fn main() -> anyhow::Result<()> {
     let db_url = std::env::var("DATABASE_URL")
         .or_else(|_| std::env::var("W9_REMINDERS_DB_URL"))
         .unwrap_or_else(|_| "postgres://w9_admin:password@w9-postgres:5432/w9_reminders".into());
-    let mail_api_base = std::env::var("W9_MAIL_API_BASE").unwrap_or_else(|_| "https://mail.w9.nu/api".into());
+    let mail_api_base =
+        std::env::var("W9_MAIL_API_BASE").unwrap_or_else(|_| "https://mail.w9.nu/api".into());
 
     let store = DataStore::new(&db_url).await?;
     let mail_client = W9MailClient::new();
 
     let state = AppState {
         store,
-        http_client: reqwest::Client::builder().timeout(std::time::Duration::from_secs(60)).build()?,
+        http_client: reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()?,
         weather: Arc::new(WeatherClient::new()),
         cerebras: Arc::new(CerebrasClient::new().ok()),
         nvidia: Arc::new(NvidiaClient::new().ok()),
@@ -685,13 +1160,20 @@ async fn main() -> anyhow::Result<()> {
         .route("/system", get(system_page))
         .route("/google/connect", get(google_connect))
         .route("/google/callback", get(google_callback))
-        .route("/api/settings", get(api_settings_get).post(api_settings_post))
+        .route(
+            "/api/settings",
+            get(api_settings_get).post(api_settings_post),
+        )
         .route("/api/reminders/preview", post(api_generate_preview))
         .route("/api/reminders/send", post(api_send_email))
         .route("/api/system/health", get(api_health))
         .route("/api/system/image-models", get(api_image_models))
         .with_state(state)
-        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()).layer(CorsLayer::permissive()));
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(CorsLayer::permissive()),
+        );
 
     let addr = format!("0.0.0.0:{}", port);
     let listener = TcpListener::bind(&addr).await?;

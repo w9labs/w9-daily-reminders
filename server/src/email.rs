@@ -32,7 +32,13 @@ pub fn build_preview(
         EmailBuildError::InvalidPayload(format!("{} · raw: {}", err, cerebras_payload))
     })?;
 
-    let html = wrap_html(&parsed.html_body, &parsed.preview, weather_advisory.as_deref(), image_url.as_deref(), settings);
+    let html = wrap_html(
+        &parsed.html_body,
+        &parsed.preview,
+        weather_advisory.as_deref(),
+        image_url.as_deref(),
+        settings,
+    );
     let text = wrap_text(&parsed.text_body, weather_advisory.as_deref());
 
     Ok(ReminderPreview {
@@ -282,7 +288,7 @@ fn sanitize_control_chars(input: &str) -> String {
                 '\n' => sanitized.push_str("\\n"),
                 '\r' => sanitized.push_str("\\r"),
                 '\t' => sanitized.push_str("\\t"),
-                c if c.is_control() => {},
+                c if c.is_control() => {}
                 _ => sanitized.push(ch),
             }
         } else {

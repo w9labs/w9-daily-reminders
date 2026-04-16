@@ -97,16 +97,18 @@ impl PollinationsClient {
     }
 
     async fn fetch_models(&self) -> Result<Vec<String>, PollinationsError> {
-        let url = format!("{}/api/generate/image/models", self.api_base.trim_end_matches('/'));
+        let url = format!(
+            "{}/api/generate/image/models",
+            self.api_base.trim_end_matches('/')
+        );
 
         let mut request = self.http.get(url);
         if let Some(api_key) = &self.api_key {
-            request = request
-                .bearer_auth(api_key)
-                .header(
-                    REFERER,
-                    HeaderValue::from_str(&self.resolve_referer()).unwrap_or_else(|_| HeaderValue::from_static("https://reminder.w9.nu/")),
-                );
+            request = request.bearer_auth(api_key).header(
+                REFERER,
+                HeaderValue::from_str(&self.resolve_referer())
+                    .unwrap_or_else(|_| HeaderValue::from_static("https://reminder.w9.nu/")),
+            );
         }
 
         let resp = request.send().await?;
@@ -123,17 +125,29 @@ impl PollinationsClient {
         Ok(names)
     }
 
-    pub async fn generate(&self, prompt: &str, model: Option<&str>) -> Result<String, PollinationsError> {
+    pub async fn generate(
+        &self,
+        prompt: &str,
+        model: Option<&str>,
+    ) -> Result<String, PollinationsError> {
         let trimmed = prompt.trim();
         if trimmed.is_empty() {
             return Err(PollinationsError::MissingPrompt);
         }
 
-        let api_key = self.api_key.as_deref().ok_or(PollinationsError::MissingKey)?;
+        let api_key = self
+            .api_key
+            .as_deref()
+            .ok_or(PollinationsError::MissingKey)?;
         self.generate_via_api(trimmed, api_key, model).await
     }
 
-    async fn generate_via_api(&self, prompt: &str, api_key: &str, model: Option<&str>) -> Result<String, PollinationsError> {
+    async fn generate_via_api(
+        &self,
+        prompt: &str,
+        api_key: &str,
+        model: Option<&str>,
+    ) -> Result<String, PollinationsError> {
         let encoded_pr = urlencoding::encode(prompt);
         let seed = Utc::now().timestamp();
         let model_name = model.unwrap_or("flux");
@@ -168,9 +182,13 @@ impl PollinationsClient {
             .bearer_auth(api_key)
             .header(
                 REFERER,
-                HeaderValue::from_str(&referer).unwrap_or_else(|_| HeaderValue::from_static("https://reminder.w9.nu/")),
+                HeaderValue::from_str(&referer)
+                    .unwrap_or_else(|_| HeaderValue::from_static("https://reminder.w9.nu/")),
             )
-            .header(USER_AGENT, HeaderValue::from_static("w9-daily-reminders/1.0"))
+            .header(
+                USER_AGENT,
+                HeaderValue::from_static("w9-daily-reminders/1.0"),
+            )
             .send()
             .await?;
 
@@ -196,6 +214,7 @@ impl PollinationsClient {
     }
 
     fn resolve_referer(&self) -> String {
-        std::env::var("POLLINATIONS_REFERRER").unwrap_or_else(|_| "https://reminder.w9.nu/".to_string())
+        std::env::var("POLLINATIONS_REFERRER")
+            .unwrap_or_else(|_| "https://reminder.w9.nu/".to_string())
     }
 }

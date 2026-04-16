@@ -28,10 +28,19 @@ impl W9MailClient {
     }
 
     fn build_url(base: &str, path: &str) -> String {
-        format!("{}/{}", base.trim_end_matches('/'), path.trim_start_matches('/'))
+        format!(
+            "{}/{}",
+            base.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        )
     }
 
-    async fn get<T: DeserializeOwned>(&self, base: &str, token: &str, path: &str) -> Result<T, W9MailError> {
+    async fn get<T: DeserializeOwned>(
+        &self,
+        base: &str,
+        token: &str,
+        path: &str,
+    ) -> Result<T, W9MailError> {
         if base.trim().is_empty() {
             return Err(W9MailError::MissingBase);
         }
@@ -51,7 +60,11 @@ impl W9MailClient {
         self.get(base, token, "/auth/me").await
     }
 
-    pub async fn list_senders(&self, base: &str, token: &str) -> Result<Vec<MailSenderOption>, W9MailError> {
+    pub async fn list_senders(
+        &self,
+        base: &str,
+        token: &str,
+    ) -> Result<Vec<MailSenderOption>, W9MailError> {
         #[derive(Deserialize)]
         struct AccountSummary {
             pub id: String,
@@ -98,7 +111,12 @@ impl W9MailClient {
         Ok(senders)
     }
 
-    pub async fn send_email(&self, base: &str, token: &str, payload: &SendEmailPayload) -> Result<(), W9MailError> {
+    pub async fn send_email(
+        &self,
+        base: &str,
+        token: &str,
+        payload: &SendEmailPayload,
+    ) -> Result<(), W9MailError> {
         if base.trim().is_empty() {
             return Err(W9MailError::MissingBase);
         }
@@ -125,7 +143,8 @@ impl W9MailClient {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_text) {
             if let Some(status) = json.get("status").and_then(|s| s.as_str()) {
                 if status == "error" {
-                    let message = json.get("message")
+                    let message = json
+                        .get("message")
                         .and_then(|m| m.as_str())
                         .unwrap_or("Unknown error from w9-mail API");
                     return Err(W9MailError::InvalidResponse(message.to_string()));
